@@ -1,5 +1,9 @@
 module XGrad
 
-# package code goes here
+export
+    xdiff,
+    @diffrule
+
+include("core.jl")
 
 end # module
