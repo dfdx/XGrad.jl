@@ -26,11 +26,11 @@ logistic(x) = 1 ./ (1 + exp.(-x))
 @diffrule logistic(x::Number) x (logistic(x) .* (1 .- logistic(x))) .* ds
 
 
-include("vae.jl")
 include("aggr.jl")
 include("linreg.jl")
 include("ann.jl")
 include("autoencoder.jl")
+include("vae.jl")
 include("others.jl")
 include("destruct.jl")
 

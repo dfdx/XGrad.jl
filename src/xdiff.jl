@@ -154,7 +154,7 @@ function xdiff(ex; ctx=Dict(), inputs...)
     rg = topsort(rg)
     infer_deriv_size!(rg)  # need to know size to evaluate things like `dz!dx[i] = 1.0`
     evaluate!(rg)
-    codegen = @get(ctx, :codegen, VectorCodeGen())
+    codegen = @get(ctx, :codegen, BufCodeGen())
     return generate_code(codegen, rg)
 end
 

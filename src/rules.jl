@@ -109,12 +109,12 @@ end
 
 # binary substraction
 @diffrule -(x::Real, y::Real)                       x     ds
-@diffrule -(x::Real, y::AbstractArray)              x     ds
+@diffrule -(x::Real, y::AbstractArray)              x     sum(ds)
 @diffrule -(x::AbstractArray, y::Real)              x     ones(size(x)) .* ds
 @diffrule -(x::AbstractArray, y::AbstractArray)     x     ds
 @diffrule -(x::Real         , y::Real)              y     -ds
-@diffrule -(x::Real, y::AbstractArray)              y     -ones(size(x)) .* ds
-@diffrule -(x::AbstractArray, y::Real)              y     -ds
+@diffrule -(x::Real, y::AbstractArray)              y     -ones(size(y)) .* ds
+@diffrule -(x::AbstractArray, y::Real)              y     -sum(ds)
 @diffrule -(x::AbstractArray, y::AbstractArray)     y     -ds
 
 # dot binary substraction
