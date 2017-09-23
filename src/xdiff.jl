@@ -121,10 +121,10 @@ end
 
 
 function reverse_pass!(g::ExGraph)
-    z = @get_or_create(g.ctx, :loss, varname(g.tape[end]))
-    g.ctx[:loss] = z
+    z = @get_or_create(g.ctx, :loss, varname(g.tape[end]))    
     dzdz_var = deriv_name(z, z)
-    dg = ExGraph(:($dzdz_var = 1.0))
+    seed = @get_or_create(g.ctx, :seed, 1.0)
+    dg = ExGraph(:($dzdz_var = $seed))
     for nd in reverse(g.tape)
         rev_step!(g, dg, nd)
     end
@@ -146,7 +146,7 @@ end
 Differentiate expression w.r.t. its inputs
 """
 function xdiff(ex; ctx=Dict(), inputs...)
-    g = ExGraph(ex; inputs...)
+    g = ExGraph(ex; ctx=ctx, inputs...)
     dg = _xdiff(g)
     rg = cat(g, dg)
     outvars = unshift!([deriv_name(g.ctx[:loss], var) for (var, _) in inputs], varname(g[end]))
