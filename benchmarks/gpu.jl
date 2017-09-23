@@ -1,29 +1,29 @@
 
-using XDiff
-using GPUArrays
+using XGrad
+using CuArrays
 using BenchmarkTools
 
 include("functions.jl")
-
 
 function perf_test(f; ctx=Dict(), inputs...)
     vals = ([val for (name, val) in inputs]...)
     println("Compiling derivatives for CPU")
     @time df = xdiff(f; ctx=ctx, inputs...)
     mem = Dict()
-    println("Testing in CPU...")
+    println("Testing on CPU...")
     r1 = @benchmark $df($vals...; mem=$mem)
     show(STDOUT, MIME{Symbol("text/plain")}(), r1)
     println("\n")
 
-    gpu_vals = ([GPUArray(v) for v in vals]...)
+    inputs = [k => convert(Array{Float32}, v) for (k, v) in inputs]
+    gpu_vals = ([CuArray(val) for (name, val) in inputs]...)
     println("Compiling derivatives for GPU")
-    ctx_gpu = merge(ctx, Dict(:codegen => CuCodeGen(:mem)))
+    ctx_gpu = merge(ctx, Dict(:codegen => CuCodeGen()))
     @time df_gpu = xdiff(f; ctx=ctx_gpu, inputs...)
     mem = Dict()
     println("Testing on GPU...")
     r2 = @benchmark $df_gpu($gpu_vals...; mem=$mem)
-    GPUArrays.gc()
+    # GPUArrays.gc()
     show(STDOUT, MIME{Symbol("text/plain")}(), r2)
     println("\n")
     println("\n----------------------------------------\n")
