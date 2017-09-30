@@ -4,7 +4,7 @@
 ## These rules have been shamelessly stolen from
 ## https://github.com/JuliaDiff/ReverseDiffSource.jl/blob/master/src/base_rules.jl
 ##
-## NOTE: `ds` stands for a gradient of loss w.r.t. current output variables. 
+## NOTE: `ds` stands for a gradient of loss w.r.t. current output variables.
 ## E.g. if `y = f(x)` and we are currently calculating gradient `dloss / dx`,
 ## then `ds` will be substituted with `dloss / dy`.
 
@@ -13,8 +13,8 @@ const DIFF_RULES = Array{Pair{Expr,Pair{Symbol,Any}},1}()
 
 
 macro diffrule(pat, var, rpat)
-    push!(DIFF_RULES, pat => (var => rpat))    
-    nothing        
+    push!(DIFF_RULES, pat => (var => rpat))
+    nothing
 end
 
 # derivation neutral functions

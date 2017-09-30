@@ -1,6 +1,8 @@
 
 using Espresso
-import Espresso: @get, @get_or_create, to_context, subs_bcast_with_dot
+import Espresso: @get, @get_or_create,
+    genname, to_context, subs_bcast_with_dot,
+    assign_chain
 
 
 include("utils.jl")

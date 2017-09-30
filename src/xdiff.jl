@@ -38,6 +38,12 @@ end
 ## forward pass
 
 function forward_pass!(g::ExGraph)
+    known_funcs = Set(rule[1].args[1] for rule in DIFF_RULES)
+    graph_funcs = Set(getexpr(nd).args[1] for nd in g if isa(nd, ExNode{:call}))
+    unknown_funcs = setdiff(graph_funcs, known_funcs)
+    unknown_func_vars = Set(varname(nd) for nd in g
+                            if isa(nd, ExNode{:call}) && getexpr(nd).args[1] in unknown_funcs)
+    inline_nodes(g, unknown_func_vars)
     evaluate!(g)
 end
 
@@ -53,7 +59,7 @@ function rev_step!(g::ExGraph, dg::ExGraph, nd::ExNode{:(=)})
     dzdx_vname = deriv_name(z, x)
     # parse!(dg, :($))
     error("Not implemented yet")
-    
+
 end
 
 
@@ -65,6 +71,28 @@ end
 function rev_step!(g::ExGraph, dg::ExGraph, nd::ExNode{:input})
     # do nothing
 end
+
+
+function rev_step!(g::ExGraph, dg::ExGraph, nd::ExNode{:field})
+    ex = getexpr(nd)
+    m_name = ex.args[1]
+    fld_name = ex.args[2].value
+    dzdx_v = deriv_name(g.ctx[:loss], m_name)
+    if haskey(dg, dzdx_v)
+        m_nd = dg[dzdx_v]
+        kw = @get_or_create(m_nd.meta, :kw, Dict())
+        dzdy_v = deriv_name(g.ctx[:loss], varname(nd))
+        kw[fld_name] = dzdy_v
+    else
+        m_nd = ExNode{:ctor}(dzdx_v, :(__construct($m_name)))
+        kw = @get_or_create(m_nd.meta, :kw, Dict())
+        dzdy_v = deriv_name(g.ctx[:loss], varname(nd))
+        kw[fld_name] = dzdy_v
+        push!(dg, m_nd)
+    end
+end
+
+# TODO: wouldn't fuse_assigned ignore metadata? use `assign_chain(dg, nd)[end]` instead?
 
 
 function rev_step!(g::ExGraph, dg::ExGraph, nd::ExNode{:call})
@@ -80,12 +108,12 @@ function rev_step!(g::ExGraph, dg::ExGraph, nd::ExNode{:call})
             # don't clog dg with unnesessary derivs
             continue
         end
-        dydx = deriv(ex, dep_vals, i)       
+        dydx = deriv(ex, dep_vals, i)
         dzdx = subs(dydx, Dict(:ds => dzdy_v))
         # dzdx = expand_const(cg, dzdx) |> simplify
         dzdx_v = deriv_name(z, x)
         if haskey(dg, dzdx_v)
-            extend_deriv!(dg, dzdx_v, dzdx)            
+            extend_deriv!(dg, dzdx_v, dzdx)
         else
             parse!(dg, :($dzdx_v = $dzdx))
         end
@@ -106,13 +134,13 @@ function rev_step!(g::ExGraph, dg::ExGraph, nd::ExNode{:bcast})
             # don't clog dg with unnesessary derivs
             continue
         end
-        dydx = deriv(ex, dep_vals, i)       
+        dydx = deriv(ex, dep_vals, i)
         dzdx = subs(dydx, Dict(:ds => dzdy_v))
         dzdx = calls_to_bcast(dzdx)
         # dzdx = expand_const(cg, dzdx) |> simplify
         dzdx_v = deriv_name(z, x)
         if haskey(dg, dzdx_v)
-            extend_deriv!(dg, dzdx_v, dzdx)            
+            extend_deriv!(dg, dzdx_v, dzdx)
         else
             parse!(dg, :($dzdx_v = $dzdx))
         end
@@ -121,7 +149,7 @@ end
 
 
 function reverse_pass!(g::ExGraph)
-    z = @get_or_create(g.ctx, :loss, varname(g.tape[end]))    
+    z = @get_or_create(g.ctx, :loss, varname(g.tape[end]))
     dzdz_var = deriv_name(z, z)
     seed = @get_or_create(g.ctx, :seed, 1.0)
     dg = ExGraph(:($dzdz_var = $seed))
@@ -167,35 +195,18 @@ function xdiff(f::Function; ctx=Dict(), inputs...)
     ctx = to_context(ctx)
     types = ([typeof(val) for (name, val) in inputs]...)
     args, ex = func_expr(f, types)
-    flat_args, ex, st = destruct(args, types, ex)
     ex = sanitize(ex)
-    flat_inputs = destruct_inputs(inputs)    
-    dex = xdiff(ex; ctx=ctx, flat_inputs...)
+    dex = xdiff(ex; ctx=ctx, inputs...)
     ctx[:dex] = dex
     mod = get(ctx, :mod, current_module())
     name = Espresso.genname("$(func_name(f))_deriv_")
-    flat_types = [top_type(val) for (name, val) in flat_inputs]
-    typed_flat_args = [:($a::$t) for (a, t) in zip(flat_args, flat_types)]    
+    # flat_types = [top_type(val) for (name, val) in flat_inputs]
+    typed_args = [:($a::$t) for (a, t) in zip(args, types)]
     # function with additional argument `mem`
-    fn_ex_mem = make_func_expr(name, [typed_flat_args; :mem], [], dex)
+    fn_ex_mem = make_func_expr(name, [typed_args; :mem], [], dex)
     fn = eval(mod, fn_ex_mem)
     # function with kw argument `mem=Dict()`
-    fn_ex_mem_kw = make_func_expr(name, typed_flat_args, [:mem => Dict()], dex)
+    fn_ex_mem_kw = make_func_expr(name, typed_args, [:mem => Dict()], dex)
     eval(mod, fn_ex_mem_kw)
-    if any(isstruct, types)
-        # preparations for model adapter
-        struct_types = [isstruct(t) ? t : top_type(t) for t in types]
-        typed_args = [:($a::$t) for (a, t) in zip(args, struct_types)]
-        rev_st = Dict(v => k for (k, v) in st)
-        model_args = [haskey(rev_st, a) ? rev_st[a] : a for a in flat_args]
-        # model adapter: with additional `mem`
-        model_fn_ex_mem = :($name($(typed_args...), mem) =
-                            $name($(model_args...), mem)) |> sanitize
-        eval(mod, model_fn_ex_mem)
-        # model adapter: with kw argument `mem=Dict()`
-        model_fn_ex_kw = :($name($(typed_args...); mem=Dict()) =
-                           $name($(model_args...); mem=Dict())) |> sanitize
-        eval(mod, model_fn_ex_kw)
-    end
     return fn
 end
