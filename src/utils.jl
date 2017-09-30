@@ -15,13 +15,6 @@ deriv_name(z::Symbol, x::Symbol) = Symbol("d$(z)!d$(x)")
 split_deriv_name(vname) = Symbol.(split(String(vname), "!"))
 
 
-# function replace_node(g::AbstractExGraph, vname::Symbol, nds::Vector{ExNode})
-#     i = indexof(g, vname)
-#     delete!(g, vname)
-#     insert!(g, nds)
-# end
-
-
 function find_related(g::AbstractExGraph, dydx_v::Symbol)
     subderivs = Symbol[]
     i = 1
@@ -68,7 +61,7 @@ const DERIV_NAME_PATTERN = r"(d.+)!(d.+)"
 
 # # (numeric) derivative size propagation
 
-function infer_deriv_size!(g::AbstractExGraph, dd_name::Symbol)    
+function infer_deriv_size!(g::AbstractExGraph, dd_name::Symbol)
     rg = match(DERIV_NAME_PATTERN, String(dd_name))
     @assert length(rg.captures) == 2
     str_dnames = rg.captures
@@ -78,8 +71,11 @@ function infer_deriv_size!(g::AbstractExGraph, dd_name::Symbol)
     evaluate!(g, zname)
     evaluate!(g, xname)
     sizes = @get_or_create(g.ctx, :rsizes, Dict())
-    zsize, xsize = (sizes[zname], sizes[xname])
-    sizes[dd_name] = (zsize..., xsize...)
+    if haskey(sizes, xname)
+        # some nodes (e.g. structs) may not have a size
+        zsize, xsize = (sizes[zname], sizes[xname])
+        sizes[dd_name] = (zsize..., xsize...)
+    end
 end
 
 

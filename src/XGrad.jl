@@ -7,7 +7,8 @@ export
     BufCodeGen,
     CuCodeGen,
     # re-export from Espresso
-    @get_or_create
+    @get_or_create,
+    __construct
 
 include("core.jl")
 

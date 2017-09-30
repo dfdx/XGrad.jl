@@ -1,7 +1,6 @@
 using XGrad
 using ReverseDiff: GradientTape, GradientConfig, gradient, gradient!, compile
 using Base.Test
-# using BenchmarkTools
 
 function test_compare(f; inputs...)
     vals = ([val for (name, val) in inputs]...)
@@ -32,5 +31,5 @@ include("ann.jl")
 include("autoencoder.jl")
 include("vae.jl")
 include("others.jl")
-include("destruct.jl")
+include("struct.jl")
 
