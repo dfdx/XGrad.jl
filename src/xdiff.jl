@@ -43,8 +43,9 @@ function forward_pass!(g::ExGraph)
     unknown_funcs = setdiff(graph_funcs, known_funcs)
     unknown_func_vars = Set(varname(nd) for nd in g
                             if isa(nd, ExNode{:call}) && getexpr(nd).args[1] in unknown_funcs)
-    inline_nodes(g, unknown_func_vars)
+    g = inline_nodes(g, unknown_func_vars)
     evaluate!(g)
+    return g
 end
 
 ## reverse pass
@@ -92,7 +93,41 @@ function rev_step!(g::ExGraph, dg::ExGraph, nd::ExNode{:field})
     end
 end
 
-# TODO: wouldn't fuse_assigned ignore metadata? use `assign_chain(dg, nd)[end]` instead?
+
+function rev_step!(g::ExGraph, dg::ExGraph, nd::ExNode{:ref})
+    ex = getexpr(nd)
+    base_name = ex.args[1]
+    base_val = getvalue(g[base_name])
+    idx = ex.args[2]
+    dzdx_v = deriv_name(g.ctx[:loss], base_name)
+    if !haskey(dg, dzdx_v)
+        @assert(isa(base_val, Tuple), "Currently only indexing of tuples is supported, " *
+                "but got $(typeof(base_val))")
+        tuple_ex = Expr(:tuple, (:_ for i=1:length(base_val))...)
+        push!(dg, :tuple, dzdx_v, tuple_ex)
+    end
+    dzdx_nd = dg[dzdx_v]
+    dzdx_ex = getexpr(dzdx_nd)
+    dzdy_v = deriv_name(g.ctx[:loss], varname(nd))
+    dzdx_ex.args[idx] = dzdy_v
+end
+
+
+function rev_step!(g::ExGraph, dg::ExGraph, nd::ExNode{:tuple})
+    z = g.ctx[:loss]
+    dzdy_v = deriv_name(z, varname(nd))
+    dzdy_nd = dg[dzdy_v]
+    dzdy_ex = getexpr(dzdy_nd)
+    for (i, x) in enumerate(dependencies(nd))
+        # map x derivative directly to the component in a tuple
+        # remove_unused() should then remove tuple altogether
+        # alternative way would be to generate expression like :(dz!dx = dz!dt[i])
+        dzdx_v = deriv_name(z, x)
+        dzdx_ex = dzdy_ex.args[i]
+        parse!(dg, :($dzdx_v = $dzdx_ex))
+    end
+end
+
 
 
 function rev_step!(g::ExGraph, dg::ExGraph, nd::ExNode{:call})
@@ -162,9 +197,9 @@ end
 
 
 function _xdiff(g::AbstractExGraph)
-    forward_pass!(g)
+    g = forward_pass!(g)
     dg = reverse_pass!(g)
-    return dg
+    return g, dg
 end
 
 
@@ -174,8 +209,9 @@ end
 Differentiate expression w.r.t. its inputs
 """
 function xdiff(ex; ctx=Dict(), inputs...)
+    ctx = to_context(ctx)
     g = ExGraph(ex; ctx=ctx, inputs...)
-    dg = _xdiff(g)
+    g, dg = _xdiff(g)
     rg = cat(g, dg)
     outvars = unshift!([deriv_name(g.ctx[:loss], var) for (var, _) in inputs], varname(g[end]))
     push!(rg, :tuple, Espresso.genname(), Expr(:tuple, outvars...))
