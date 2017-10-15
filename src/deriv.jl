@@ -1,24 +1,28 @@
 
 ## deriv.jl - derivative of a single ExNode
 
-const DIFF_PHS = Set([:x, :y, :z])
+const DIFF_PHS = Set([:w, :x, :y, :z])
 
+isparameters(a) = isa(a, Expr) && a.head == :parameters
 
 function without_types(pat)
     rpat = copy(pat)
     for i=2:length(rpat.args)
-        rpat.args[i] = isa(rpat.args[i],  Expr) ? rpat.args[i].args[1] : rpat.args[i]
+        a = rpat.args[i]
+        if !isparameters(a)  # parameters aren't modified
+            rpat.args[i] = isa(a, Expr) ? a.args[1] : a
+        end
     end
     return rpat
 end
 
 
 function get_arg_names(pat)
-    return [isa(a, Expr) ? a.args[1] : a for a in pat.args[2:end]]
+    return [isa(a, Expr) ? a.args[1] : a for a in pat.args[2:end] if !isparameters(a)]
 end
 
 function get_arg_types(pat)
-    return [isa(a, Expr) ? eval(Base, a.args[2]) : Any for a in pat.args[2:end]]
+    return [isa(a, Expr) ? eval(Base, a.args[2]) : Any for a in pat.args[2:end] if !isparameters(a)]
 end
 
 
