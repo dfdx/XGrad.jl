@@ -38,13 +38,14 @@ end
 ## forward pass
 
 function forward_pass!(g::ExGraph)
+    evaluate!(g) # to get types of all variables and find correct functions to inline
     known_funcs = Set(rule[1].args[1] for rule in DIFF_RULES)
     graph_funcs = Set(getexpr(nd).args[1] for nd in g if isa(nd, ExNode{:call}))
     unknown_funcs = setdiff(graph_funcs, known_funcs)
     unknown_func_vars = Set(varname(nd) for nd in g
                             if isa(nd, ExNode{:call}) && getexpr(nd).args[1] in unknown_funcs)
     g = inline_nodes(g, unknown_func_vars)
-    evaluate!(g)
+    evaluate!(g; force=true)
     return g
 end
 
