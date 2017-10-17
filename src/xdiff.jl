@@ -242,7 +242,7 @@ function xdiff(f::Function; ctx=Dict(), inputs...)
     fn_ex_mem = make_func_expr(name, [typed_args; :mem], [], dex)
     fn = eval(mod, fn_ex_mem)
     # function with kw argument `mem=Dict()`
-    fn_ex_mem_kw = make_func_expr(name, typed_args, [:mem => Dict()], dex)
+    fn_ex_mem_kw = make_func_expr(name, typed_args, [:mem => :(Dict{Any,Any}())], dex)
     eval(mod, fn_ex_mem_kw)
     return fn
 end

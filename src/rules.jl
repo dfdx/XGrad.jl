@@ -269,7 +269,7 @@ end
 # dot power
 @diffrule .^(x::Real         , y::Real )           x     y * x ^ (y-1) * ds
 @diffrule .^(x::Real         , y::AbstractArray)   x     sum(y .* x .^ (y-1) .* ds)
-@diffrule .^(x::AbstractArray, y::Real )           x     y * x .^ (y-1) .* ds
+@diffrule .^(x::AbstractArray, y::Real )           x     y .* x .^ (y-1) .* ds
 @diffrule .^(x::AbstractArray, y::AbstractArray)   x     y .* x .^ (y-1) .* ds
 
 @diffrule .^(x::Real         , y::Real )           y     log(x) * x ^ y * ds
@@ -301,10 +301,10 @@ end
 
 # erf, erfc, gamma, beta, lbeta, lgamma
 @diffrule erf(x::Real)                       x     2/sqrt(π) * exp(-x  * x)  * ds
-@diffrule erf(x::AbstractArray)              x     2/sqrt(π) * exp(-x .* x) .* ds
+@diffrule erf(x::AbstractArray)              x     2/sqrt(π) .* exp(-x .* x) .* ds
 
 @diffrule erfc(x::Real)                      x     -2/sqrt(π) * exp(-x  * x)  * ds
-@diffrule erfc(x::AbstractArray)             x     -2/sqrt(π) * exp(-x .* x) .* ds
+@diffrule erfc(x::AbstractArray)             x     -2/sqrt(π) .* exp(-x .* x) .* ds
 
 @diffrule gamma(x::Real)                     x     polygamma(0,x)  * gamma(x)  * ds
 @diffrule gamma(x::AbstractArray)            x     polygamma(0,x) .* gamma(x) .* ds
