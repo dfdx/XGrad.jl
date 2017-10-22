@@ -238,7 +238,7 @@ function xdiff(f::Function; ctx=Dict(), inputs...)
     mod = get(ctx, :mod, current_module())
     name = Espresso.genname("$(func_name(f))_deriv_")
     # flat_types = [top_type(val) for (name, val) in flat_inputs]
-    typed_args = [:($a::$t) for (a, t) in zip(args, types)]
+    typed_args = [:($a::$t) for (a, t) in zip(args, map(top_type, types))]
     # function with additional argument `mem`
     fn_ex_mem = make_func_expr(name, [typed_args; :mem], [], dex)
     fn = eval(mod, fn_ex_mem)

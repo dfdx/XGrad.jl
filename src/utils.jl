@@ -94,6 +94,8 @@ end
 "The top type describing given data"
 top_type(x::AbstractArray{T,N}) where {T,N} = AbstractArray{T,N}
 top_type(x::Number) = Number
+top_type(x::T) where T = T
 
 top_type(::Type{AT}) where {AT <: AbstractArray{T,N}} where {T,N} = AbstractArray{T,N}
 top_type(::Type{T}) where {T <: Number} = Number
+top_type(::Type{T}) where T = T
