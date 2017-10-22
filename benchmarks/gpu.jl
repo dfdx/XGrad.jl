@@ -5,7 +5,9 @@ using BenchmarkTools
 
 include("functions.jl")
 
-function perf_test(f; ctx=Dict(), inputs...)
+function perf_test(f; _ctx=Dict(), inputs...)
+    # default eltype for CPU is Float64
+    ctx = copy(_ctx)
     vals = ([val for (name, val) in inputs]...)
     println("Compiling derivatives for CPU")
     @time df = xdiff(f; ctx=ctx, inputs...)
@@ -15,10 +17,11 @@ function perf_test(f; ctx=Dict(), inputs...)
     show(STDOUT, MIME{Symbol("text/plain")}(), r1)
     println("\n")
 
+    # CUDA better works with Float32
     inputs = [k => convert(Array{Float32}, v) for (k, v) in inputs]
     gpu_vals = ([CuArray(val) for (name, val) in inputs]...)
     println("Compiling derivatives for GPU")
-    ctx_gpu = merge(ctx, Dict(:codegen => CuCodeGen()))
+    ctx_gpu = merge(_ctx, Dict(:codegen => CuCodeGen()))
     @time df_gpu = xdiff(f; ctx=ctx_gpu, inputs...)
     mem = Dict()
     println("Testing on GPU...")
@@ -83,7 +86,7 @@ function benchmark_rnn()
     f = rnn
     println("\n## On larger data\n")
     Wxh = randn(4096, 4096); Whh = randn(4096, 4096); Why = randn(128, 4096);
-    hprev = randn(4096); x = randn(4096); y = randn(128);    
+    hprev = randn(4096); x = randn(4096); y = randn(128);
     inputs = [:Wxh=>Wxh, :Whh=>Whh, :Why=>Why, :hprev => hprev, :x => x, :y=>y];
     perf_test(f; ctx=Dict(:cost => :cost), inputs...)
 
