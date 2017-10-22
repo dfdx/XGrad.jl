@@ -5,6 +5,35 @@ using BenchmarkTools
 
 include("functions.jl")
 
+# fuonction perf_test(f; _ctx=Dict(), inputs...)
+#     # default eltype for CPU is Float64
+#     ctx = copy(_ctx)
+#     vals = ([val for (name, val) in inputs]...)
+#     println("Compiling derivatives for CPU")
+#     @time df = xdiff(f; ctx=ctx, inputs...)
+#     mem = Dict()
+#     println("Testing on CPU...")
+#     r1 = @benchmark $df($vals...; mem=$mem)
+#     show(STDOUT, MIME{Symbol("text/plain")}(), r1)
+#     println("\n")
+
+#     # CUDA better works with Float32
+#     inputs = [k => convert(Array{Float32}, v) for (k, v) in inputs]
+#     gpu_vals = ([CuArray(val) for (name, val) in inputs]...)
+#     println("Compiling derivatives for GPU")
+#     ctx_gpu = merge(_ctx, Dict(:codegen => CuCodeGen()))
+#     @time df_gpu = xdiff(f; ctx=ctx_gpu, inputs...)
+#     mem = Dict()
+#     println("Testing on GPU...")
+#     r2 = @benchmark $df_gpu($gpu_vals...; mem=$mem)
+#     # GPUArrays.gc()
+#     show(STDOUT, MIME{Symbol("text/plain")}(), r2)
+#     println("\n")
+#     println("\n----------------------------------------\n")
+#     return r1, r2
+# end
+
+
 function perf_test(f; _ctx=Dict(), inputs...)
     # default eltype for CPU is Float64
     ctx = copy(_ctx)
@@ -18,11 +47,11 @@ function perf_test(f; _ctx=Dict(), inputs...)
     println("\n")
 
     # CUDA better works with Float32
-    inputs = [k => convert(Array{Float32}, v) for (k, v) in inputs]
-    gpu_vals = ([CuArray(val) for (name, val) in inputs]...)
+    inputs = [k => convert(CuArray{Float32}, v) for (k, v) in inputs]
+    gpu_vals = ([val for (name, val) in inputs]...)
     println("Compiling derivatives for GPU")
-    ctx_gpu = merge(_ctx, Dict(:codegen => CuCodeGen()))
-    @time df_gpu = xdiff(f; ctx=ctx_gpu, inputs...)
+    # ctx_gpu = merge(_ctx, Dict(:codegen => CuCodeGen()))
+    @time df_gpu = xdiff(f; ctx=copy(_ctx), inputs...)
     mem = Dict()
     println("Testing on GPU...")
     r2 = @benchmark $df_gpu($gpu_vals...; mem=$mem)
@@ -32,7 +61,6 @@ function perf_test(f; _ctx=Dict(), inputs...)
     println("\n----------------------------------------\n")
     return r1, r2
 end
-
 
 
 function benchmark_autoencoder()

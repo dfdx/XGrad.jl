@@ -221,7 +221,7 @@ Differentiate expression w.r.t. its inputs
 function xdiff(ex; ctx=Dict(), inputs...)
     ctx = to_context(ctx)
     codegen = @get(ctx, :codegen, autoselect_codegen(inputs))
-    inputs = unconvert_cuarrays(inputs)
+    # inputs = unconvert_cuarrays(inputs)
     g = ExGraph(ex; ctx=ctx, inputs...)
     g, dg = _xdiff(g)
     rg = cat(g, dg)
