@@ -204,6 +204,15 @@ function _xdiff(g::AbstractExGraph)
 end
 
 
+iscuarray(v) = startswith(string(typeof(v)), "CuArray")
+
+# currently CuArrays can't be used directly in xdiff, so instead we convert them
+# to ordinary Arrays, find gradients and use CuCodeGen to generate code for CUDA
+# if inputs are not CuArrays, this function effectively does nothing
+function unconvert_cuarrays(inputs)
+    return [iscuarray(v) ? k => convert(Array, v) : k => v for (k, v) in inputs]
+end
+
 
 
 """
@@ -211,6 +220,8 @@ Differentiate expression w.r.t. its inputs
 """
 function xdiff(ex; ctx=Dict(), inputs...)
     ctx = to_context(ctx)
+    codegen = @get(ctx, :codegen, autoselect_codegen(inputs))
+    inputs = unconvert_cuarrays(inputs)
     g = ExGraph(ex; ctx=ctx, inputs...)
     g, dg = _xdiff(g)
     rg = cat(g, dg)
@@ -219,7 +230,6 @@ function xdiff(ex; ctx=Dict(), inputs...)
     rg = topsort(rg)
     infer_deriv_size!(rg)  # need to know size to evaluate things like `dz!dx[i] = 1.0`
     evaluate!(rg)
-    codegen = @get(ctx, :codegen, BufCodeGen())
     return generate_code(codegen, rg)
 end
 
@@ -237,7 +247,6 @@ function xdiff(f::Function; ctx=Dict(), inputs...)
     ctx[:dex] = dex
     mod = get(ctx, :mod, current_module())
     name = Espresso.genname("$(func_name(f))_deriv_")
-    # flat_types = [top_type(val) for (name, val) in flat_inputs]
     typed_args = [:($a::$t) for (a, t) in zip(args, map(top_type, types))]
     # function with additional argument `mem`
     fn_ex_mem = make_func_expr(name, [typed_args; :mem], [], dex)
