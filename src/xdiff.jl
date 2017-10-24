@@ -188,7 +188,7 @@ function reverse_pass!(g::ExGraph)
     z = @get_or_create(g.ctx, :loss, varname(g.tape[end]))
     dzdz_var = deriv_name(z, z)
     seed = @get_or_create(g.ctx, :seed, 1.0)
-    dg = ExGraph(:($dzdz_var = $seed))
+    dg = ExGraph(:($dzdz_var = $seed); ctx=g.ctx)
     for nd in reverse(g.tape)
         rev_step!(g, dg, nd)
     end
@@ -206,12 +206,12 @@ end
 
 iscuarray(v) = startswith(string(typeof(v)), "CuArray")
 
-# currently CuArrays can't be used directly in xdiff, so instead we convert them
-# to ordinary Arrays, find gradients and use CuCodeGen to generate code for CUDA
-# if inputs are not CuArrays, this function effectively does nothing
-function unconvert_cuarrays(inputs)
-    return [iscuarray(v) ? k => convert(Array, v) : k => v for (k, v) in inputs]
-end
+# # currently CuArrays can't be used directly in xdiff, so instead we convert them
+# # to ordinary Arrays, find gradients and use CuCodeGen to generate code for CUDA
+# # if inputs are not CuArrays, this function effectively does nothing
+# function unconvert_cuarrays(inputs)
+#     return [iscuarray(v) ? k => convert(Array, v) : k => v for (k, v) in inputs]
+# end
 
 
 
@@ -220,15 +220,16 @@ Differentiate expression w.r.t. its inputs
 """
 function xdiff(ex; ctx=Dict(), inputs...)
     ctx = to_context(ctx)
-    codegen = @get(ctx, :codegen, autoselect_codegen(inputs))
-    inputs = unconvert_cuarrays(inputs)
+    codegen = @get_or_create(ctx, :codegen, autoselect_codegen(inputs))
+    ctx[:bitness] = sizeof(codegen.eltyp) * 8
+    # inputs = unconvert_cuarrays(inputs)
     g = ExGraph(ex; ctx=ctx, inputs...)
     g, dg = _xdiff(g)
     rg = cat(g, dg)
     outvars = unshift!([deriv_name(g.ctx[:loss], var) for (var, _) in inputs], varname(g[end]))
     push!(rg, :tuple, Espresso.genname(), Expr(:tuple, outvars...))
     rg = topsort(rg)
-    infer_deriv_size!(rg)  # need to know size to evaluate things like `dz!dx[i] = 1.0`
+    infer_deriv_size!(rg) # do we still need this? can we replace rsizes with actual sizes? 
     evaluate!(rg)
     return generate_code(codegen, rg)
 end
