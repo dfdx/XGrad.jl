@@ -207,7 +207,7 @@ end
 
 # abs, max(), min()
 @diffrule abs(x::Real)                             x     sign(x) * ds
-@diffrule abs2(x::Real)                            x     2 .* abs(x) .* sign(x) .* x
+@diffrule abs2(x::Real)                            x     2.0 .* abs(x) .* sign(x) .* x
 
 
 @diffrule max(x::Real         , y::Real)           x     (x > y) * ds
@@ -300,11 +300,11 @@ end
 @diffrule transpose(x::AbstractArray)              x     transpose(ds)
 
 # erf, erfc, gamma, beta, lbeta, lgamma
-@diffrule erf(x::Real)                       x     2/sqrt(π) * exp(-x  * x)  * ds
-@diffrule erf(x::AbstractArray)              x     2/sqrt(π) .* exp(-x .* x) .* ds
+@diffrule erf(x::Real)                       x     2.0/sqrt(π) * exp(-x  * x)  * ds
+@diffrule erf(x::AbstractArray)              x     2.0/sqrt(π) .* exp(-x .* x) .* ds
 
-@diffrule erfc(x::Real)                      x     -2/sqrt(π) * exp(-x  * x)  * ds
-@diffrule erfc(x::AbstractArray)             x     -2/sqrt(π) .* exp(-x .* x) .* ds
+@diffrule erfc(x::Real)                      x     -2.0/sqrt(π) * exp(-x  * x)  * ds
+@diffrule erfc(x::AbstractArray)             x     -2.0/sqrt(π) .* exp(-x .* x) .* ds
 
 @diffrule gamma(x::Real)                     x     polygamma(0,x)  * gamma(x)  * ds
 @diffrule gamma(x::AbstractArray)            x     polygamma(0,x) .* gamma(x) .* ds

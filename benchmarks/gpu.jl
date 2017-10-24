@@ -36,6 +36,7 @@ include("functions.jl")
 
 function perf_test(f; _ctx=Dict(), inputs...)
     # default eltype for CPU is Float64
+    inputs = [k => convert(Array{Float32}, v) for (k, v) in inputs]
     ctx = copy(_ctx)
     vals = ([val for (name, val) in inputs]...)
     println("Compiling derivatives for CPU")
@@ -110,17 +111,17 @@ end
 
 
 
-function benchmark_rnn()
-    f = rnn
-    println("\n## On larger data\n")
-    Wxh = randn(4096, 4096); Whh = randn(4096, 4096); Why = randn(128, 4096);
-    hprev = randn(4096); x = randn(4096); y = randn(128);
-    inputs = [:Wxh=>Wxh, :Whh=>Whh, :Why=>Why, :hprev => hprev, :x => x, :y=>y];
-    perf_test(f; ctx=Dict(:cost => :cost), inputs...)
+# function benchmark_rnn()
+#     f = rnn
+#     println("\n## On larger data\n")
+#     Wxh = randn(4096, 4096); Whh = randn(4096, 4096); Why = randn(128, 4096);
+#     hprev = randn(4096); x = randn(4096); y = randn(128);
+#     inputs = [:Wxh=>Wxh, :Whh=>Whh, :Why=>Why, :hprev => hprev, :x => x, :y=>y];
+#     perf_test(f; ctx=Dict(:cost => :cost), inputs...)
 
-    # println("\n## On smaller data\n")
-    # w1=rand(200, 1000); w2=rand(100, 200); w3=rand(100, 100); x1=rand(1000, 10);
-    # b1 =  rand(200); b2 = rand(100); b3 = rand(100)
-    # inputs = [:w1=>w1, :w2=>w2, :w3=>w3, :b1 => b1, :b2 => b2, :b3 => b3, :x1=>x1];
-    # perf_test(f; ctx=Dict(:cost => :cost), inputs...)
-end
+#     # println("\n## On smaller data\n")
+#     # w1=rand(200, 1000); w2=rand(100, 200); w3=rand(100, 100); x1=rand(1000, 10);
+#     # b1 =  rand(200); b2 = rand(100); b3 = rand(100)
+#     # inputs = [:w1=>w1, :w2=>w2, :w3=>w3, :b1 => b1, :b2 => b2, :b3 => b3, :x1=>x1];
+#     # perf_test(f; ctx=Dict(:cost => :cost), inputs...)
+# end
