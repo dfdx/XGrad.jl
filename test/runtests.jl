@@ -32,4 +32,4 @@ include("autoencoder.jl")
 include("vae.jl")
 include("others.jl")
 include("struct.jl")
-
+include("xgrad.jl")
