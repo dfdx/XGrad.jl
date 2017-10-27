@@ -68,11 +68,11 @@ end
 @diffrule vcat(x,y,z,t)  t     ds[4]
 
 # reshape
-@diffrule reshape(x::AbstractArray, a, b)        x    reshape(ds, size(x))
-@diffrule reshape(x::AbstractArray, a, b)        a    0.0
-@diffrule reshape(x::AbstractArray, a, b)        b    0.0
-@diffrule reshape(x::AbstractArray, d::Tuple)    x    reshape(ds, size(x))
-@diffrule reshape(x::AbstractArray, d::Tuple)    d    0.0
+@diffrule reshape(x::AbstractArray, _a, _b)         x    reshape(ds, size(x))
+@diffrule reshape(x::AbstractArray, _a, _b)        _a    0.0
+@diffrule reshape(x::AbstractArray, _a, _b)        _b    0.0
+@diffrule reshape(x::AbstractArray, _d::Tuple)      x    reshape(ds, size(x))
+@diffrule reshape(x::AbstractArray, _d::Tuple)     _d    0.0
 
 
 # square root
