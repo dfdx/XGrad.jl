@@ -12,7 +12,7 @@ function extend_deriv!(dg::ExGraph, dzdx_v::Symbol, dzdx::Any)
         dzdx_ex_2 = dzdx
         dzdx_v_1 = Symbol("$(dzdx_v)__1")
         dzdx_v_2 = Symbol("$(dzdx_v)__2")
-        sub_dg = ExGraph()
+        sub_dg = ExGraph(;ctx=copy(dg.ctx))
         parse!(sub_dg, :($dzdx_v_1 = $dzdx_ex_1))
         parse!(sub_dg, :($dzdx_v_2 = $dzdx_ex_2))
         parse!(sub_dg, :($dzdx_v = $dzdx_v_1 .+ $dzdx_v_2))
@@ -39,13 +39,17 @@ end
 
 function forward_pass!(g::ExGraph)
     evaluate!(g) # to get types of all variables and find correct functions to inline
-    known_funcs = Set(rule[1].args[1] for rule in DIFF_RULES)
-    graph_funcs = Set(getexpr(nd).args[1] for nd in g if isa(nd, ExNode{:call}))
-    unknown_funcs = setdiff(graph_funcs, known_funcs)
-    unknown_func_vars = Set(varname(nd) for nd in g
-                            if isa(nd, ExNode{:call}) && getexpr(nd).args[1] in unknown_funcs)
-    g = inline_nodes(g, unknown_func_vars)
-    evaluate!(g; force=true)
+    done = false
+    while !done
+        known_funcs = map(sanitize, Set(rule[1].args[1] for rule in DIFF_RULES))
+        graph_funcs = Set(getexpr(nd).args[1] for nd in g if isa(nd, ExNode{:call}))
+        unknown_funcs = setdiff(graph_funcs, known_funcs)
+        unknown_func_vars = Set(varname(nd) for nd in g
+                                if isa(nd, ExNode{:call}) && getexpr(nd).args[1] in unknown_funcs)
+        g = inline_nodes(g, unknown_func_vars)
+        evaluate!(g; force=true)
+        done = isempty(unknown_func_vars)
+    end
     return g
 end
 
@@ -136,7 +140,7 @@ function rev_step!(g::ExGraph, dg::ExGraph, nd::ExNode{:call})
     z = g.ctx[:loss]
     dzdy_v = deriv_name(z, y)
     cg = cat(g, dg)
-    ex = getexpr(nd)
+    ex = getexpr_kw(nd)
     dep_vals = [getvalue(g[x]) for x in dependencies(nd)]
     for (i, x) in enumerate(dependencies(nd))
         xnd = g[x]
@@ -162,7 +166,7 @@ function rev_step!(g::ExGraph, dg::ExGraph, nd::ExNode{:bcast})
     z = g.ctx[:loss]
     dzdy_v = deriv_name(z, y)
     cg = cat(g, dg)
-    ex = bcast_to_call(getexpr(nd))
+    ex = bcast_to_call(getexpr_kw(nd))
     dep_vals = [getvalue(g[x])[1] for x in dependencies(nd)]
     for (i, x) in enumerate(dependencies(nd))
         xnd = g[x]
@@ -229,7 +233,7 @@ function xdiff(ex; ctx=Dict(), inputs...)
     outvars = unshift!([deriv_name(g.ctx[:loss], var) for (var, _) in inputs], varname(g[end]))
     push!(rg, :tuple, Espresso.genname(), Expr(:tuple, outvars...))
     rg = topsort(rg)
-    infer_deriv_size!(rg) # do we still need this? can we replace rsizes with actual sizes? 
+    infer_deriv_size!(rg) # do we still need this? can we replace rsizes with actual sizes?
     evaluate!(rg)
     return generate_code(codegen, rg)
 end
@@ -242,7 +246,7 @@ Differentiate function w.r.t. its inputs
 function xdiff(f::Function; ctx=Dict(), inputs...)
     ctx = to_context(ctx)
     types = ([typeof(val) for (name, val) in inputs]...)
-    args, ex = func_expr(f, types)
+    args, ex = funexpr(f, types)
     ex = sanitize(ex)
     dex = xdiff(ex; ctx=ctx, inputs...)
     ctx[:dex] = dex

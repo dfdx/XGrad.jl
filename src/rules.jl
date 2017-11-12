@@ -13,6 +13,7 @@ const DIFF_RULES = Array{Pair{Expr,Pair{Symbol,Any}},1}()
 
 
 macro diffrule(pat, var, rpat)
+    pat, rpat = map(sanitize, (pat, rpat))
     push!(DIFF_RULES, pat => (var => rpat))
     nothing
 end

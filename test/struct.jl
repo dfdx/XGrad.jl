@@ -3,6 +3,8 @@ mutable struct Linear
     b
 end
 
+Linear() = Linear(rand(1,1), rand(1))
+
 
 function linear_cost(m::Linear, x, y)
     sum((m.W * x .+ m.b .- y) .^ 2)

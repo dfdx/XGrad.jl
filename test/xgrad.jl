@@ -5,6 +5,8 @@ mutable struct Linear2
     b::Vector{Float64}    
 end
 
+Linear2() = Linear2(rand(1,1), rand(1))
+
 predict(m::Linear2, x) = m.W * x .+ m.b
 
 loss(m::Linear2, x, y) = sum((predict(m, x) .- y).^2)
