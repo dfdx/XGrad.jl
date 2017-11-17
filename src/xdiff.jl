@@ -248,6 +248,7 @@ function xdiff(f::Function; ctx=Dict(), inputs...)
     types = ([typeof(val) for (name, val) in inputs]...)
     args, ex = funexpr(f, types)
     ex = sanitize(ex)
+    ctx[:mod] = Espresso.func_mod(f)
     dex = xdiff(ex; ctx=ctx, inputs...)
     ctx[:dex] = dex
     mod = get(ctx, :mod, current_module())
