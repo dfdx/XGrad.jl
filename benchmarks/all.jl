@@ -1,13 +1,18 @@
 
 using XGrad
 using ReverseDiff: GradientTape, GradientConfig, gradient, gradient!, compile
+using AutoGrad
 using BenchmarkTools
 
 include("functions.jl")
 
 
+# NOTE: benchmarks for different tools seem to affect each other when run
+# one after another, so for clear picture it's best to test them
+# one by one, each in a frech Julia session
 function perf_test(f; ctx=Dict(), compile_tape=true, inputs...)
     vals = ([val for (name, val) in inputs]...)
+
     println("Compiling derivatives using XGrad")
     @time df = xdiff(f; ctx=ctx, inputs...)
     mem = Dict()
@@ -30,8 +35,16 @@ function perf_test(f; ctx=Dict(), compile_tape=true, inputs...)
         r2 = @benchmark gradient!($results, $f_tape, $vals)
     end
     show(STDOUT, MIME{Symbol("text/plain")}(), r2)
+    println("\n")
+
+    println("Compiling derivatives using AutoGrad")
+    auto_g = grad(vals -> f(vals...))
+    r3 = @benchmark $auto_g($vals)
+    show(STDOUT, MIME{Symbol("text/plain")}(), r3)
+    println("\n")
+    
     println("\n----------------------------------------\n")
-    return r1, r2
+    # return r1, r2, r3
 end
 
 
