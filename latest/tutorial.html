@@ -56,7 +56,13 @@ loss(W, b, x, y) = sum((predict(W, b, x) .- y)^2)
 include(&quot;loss.jl&quot;)
 W = rand(3,4); b = rand(3); x = rand(4); y=rand(3)
 dloss = xdiff(loss; W=W, b=b, x=x, y=y)
-dloss(W, b, x, y)</code></pre><p>And voilà! We get a value of the same structure as in previous section:</p><pre><code class="language-none">(3.531294775990527, [1.0199 1.09148 0.75925 0.315196; 1.92224 2.05715 1.43099 0.594062; 1.33645 1.43025 0.994905 0.413026], [1.50102, 2.82903, 1.9669], [2.20104, 3.07484, 3.31411, 4.33103], [-1.50102, -2.82903, -1.9669])</code></pre><div class="admonition note"><div class="admonition-title">Note</div><div class="admonition-text"><p>XGrad works on Julia source code. When differentiating a function, XGrad first tries to read its source code from a file where it was defined (using <a href="https://github.com/SimonDanisch/Sugar.jl">Sugar.jl</a>) and, if failed, to recover code from a lowered AST. The latter doesn&#39;t always work, so if you are working in REPL, it&#39;s a good idea to put functions to differentiate to a separate file and then <code>include(...)</code> it. Also see <a href="codediscovery.html#Code-Discovery-1">Code Discovery</a> for some other rules.</p></div></div><h2><a class="nav-anchor" id="Memory-buffers-1" href="#Memory-buffers-1">Memory buffers</a></h2><p>Remember a strange <code>mem</code> variable that we&#39;ve seen in the <a href="tutorial.html#Expression-differentiation-1">Expression differentiation</a> section? It turns out that significant portion of time for computing a derivative (as well as any numeric code with tensors) is spend on memory allocations. The obvious way to fix it is to use memory buffers and in-place functions. This is exactly the default behavior of XGrad.jl: it allocates buffers for all temporary variables in <code>mem</code> dictionary and rewrites expressions using BLAS, broadcasting and in-place assignments. To take advantage of this feature, just add a buffer of type  <code>Dict{Any,Any}()</code> as a last argument to the derivative function:</p><pre><code class="language-none">mem = Dict()
+dloss(W, b, x, y)</code></pre><p>And voilà! We get a value of the same structure as in previous section:</p><pre><code class="language-none">(3.531294775990527, [1.0199 1.09148 0.75925 0.315196; 1.92224 2.05715 1.43099 0.594062; 1.33645 1.43025 0.994905 0.413026], [1.50102, 2.82903, 1.9669], [2.20104, 3.07484, 3.31411, 4.33103], [-1.50102, -2.82903, -1.9669])</code></pre><div class="admonition note"><div class="admonition-title">Note</div><div class="admonition-text"><p>XGrad works on Julia source code. When differentiating a function, XGrad first tries to read its source code from a file where it was defined (using <a href="https://github.com/SimonDanisch/Sugar.jl">Sugar.jl</a>) and, if failed, to recover code from a lowered AST. The latter doesn&#39;t always work, so if you are working in REPL, it&#39;s a good idea to put functions to differentiate to a separate file and then <code>include(...)</code> it. Also see <a href="codediscovery.html#Code-Discovery-1">Code Discovery</a> for some other rules.</p></div></div><p>Compiling function derivatives beforehand may be tedious, so there&#39;s also a convenient shortcut - <code>xgrad</code> - that compiles derivatives dynamically and caches them for later use. We can rewrite previous example as:</p><pre><code class="language-none">include(&quot;loss.jl&quot;)
+W = rand(3,4); b = rand(3); x = rand(4); y=rand(3)
+xgrad(loss; W=W, b=b, x=x, y=y)</code></pre><p>This is very convenient when using in a training loop in machine learning, e.g. something like this:</p><pre><code class="language-none">W, b = ...
+for (x, y) in batchview((X, Y))
+    dW, db, dx, dy = xgrad(loss; W=W, b=b, x=x, y=y)   # compiled once, applied at each iteration
+    update_params!(W, b, dW, db)
+end</code></pre><h2><a class="nav-anchor" id="Memory-buffers-1" href="#Memory-buffers-1">Memory buffers</a></h2><p>Remember a strange <code>mem</code> variable that we&#39;ve seen in the <a href="tutorial.html#Expression-differentiation-1">Expression differentiation</a> section? It turns out that significant portion of time for computing a derivative (as well as any numeric code with tensors) is spend on memory allocations. The obvious way to fix it is to use memory buffers and in-place functions. This is exactly the default behavior of XGrad.jl: it allocates buffers for all temporary variables in <code>mem</code> dictionary and rewrites expressions using BLAS, broadcasting and in-place assignments. To take advantage of this feature, just add a buffer of type  <code>Dict{Any,Any}()</code> as a last argument to the derivative function:</p><pre><code class="language-none">mem = Dict()
 dloss(W, b, x, y, mem)</code></pre><p>If you take a look at the value of <code>mem</code> after this call, you will find a number of keys for each intermediate variable. Here&#39;s a full example:</p><pre><code class="language-none">include(&quot;loss.jl&quot;)
 W = rand(1000, 10_000); b = rand(1000); x = rand(10_000, 100); y=rand(1000)
 dloss = xdiff(loss; W=W, b=b, x=x, y=y)
@@ -70,11 +76,16 @@ using BenchmarkTools
 # with mem
 mem = Dict()
 @btime dloss(W, b, x, y, mem)
-# ==&gt; 100.354 ms (26 allocations: 797.86 KiB)</code></pre><h2><a class="nav-anchor" id="Struct-derivatives-1" href="#Struct-derivatives-1">Struct derivatives</a></h2><p>So far our loss functions were pretty simple taking only a couple of parameters, but in real life machine learning models have many more of them. Copying a dozen of arguments all over the code quickly becomes a pain in the neck. To fight this issue, XGrad supports derivatives of (mutable) structs. Here&#39;s an example:</p><pre><code class="language-none"># in file linear.jl
+# ==&gt; 100.354 ms (26 allocations: 797.86 KiB)</code></pre><p><code>xgrad</code> supports memory buffers using keyword parameter <code>mem</code>:</p><pre><code class="language-none">@btime xgrad(loss; W=W, b=b, x=x, y=y, mem=mem)
+# ==&gt; 100.640 ms (113 allocations: 802.36 KiB)</code></pre><h2><a class="nav-anchor" id="Struct-derivatives-1" href="#Struct-derivatives-1">Struct derivatives</a></h2><p>So far our loss functions were pretty simple taking only a couple of parameters, but in real life machine learning models have many more of them. Copying a dozen of arguments all over the code quickly becomes a pain in the neck. To fight this issue, XGrad supports derivatives of (mutable) structs. Here&#39;s an example:</p><pre><code class="language-none"># in file linear.jl
 mutable struct Linear
     W::Matrix{Float64}
     b::Vector{Float64}
 end
+
+# we need a default constructor to instantiate a struct
+# fields shouldn&#39;t necessary have meaningful values
+Linear() = Linear(zeros(1,1), zeros(1))
 
 predict(m::Linear, x) = m.W * x .+ m.b
 
@@ -86,7 +97,9 @@ include(&quot;linear.jl&quot;)
 m = Linear(randn(3,4), randn(3))
 x = rand(4); y = rand(3)
 dloss = xdiff(loss; m=m, x=x, y=y)
-y_hat, dm, dx, dy = dloss(m, x, y)</code></pre><p>Just like with arrays in previous example, <code>dm</code> has the same type (<code>Linear</code>) and size of its fields (<code>dm.W</code> and <code>dm.b</code>) as original model, but holds gradients of paramaters instead of their values. If you are doing something like SGD on model parameters, you can then update the model like this:</p><pre><code class="language-none">for fld in fieldnames(typeof(m))
+y_hat, dm, dx, dy = dloss(m, x, y)
+# or using `xgrad`
+y_hat, dm, dx, dy = xgrad(loss; m=m, x=x, y=y)</code></pre><p>Just like with arrays in previous example, <code>dm</code> has the same type (<code>Linear</code>) and size of its fields (<code>dm.W</code> and <code>dm.b</code>) as original model, but holds gradients of paramaters instead of their values. If you are doing something like SGD on model parameters, you can then update the model like this:</p><pre><code class="language-none">for fld in fieldnames(typeof(m))
     theta = getfield(m, fld)
     theta .-= getfield(dm, fld)
     setfield!(m, fld, theta)
