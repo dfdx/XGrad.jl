@@ -139,6 +139,24 @@ And voilà! We get a value of the same structure as in previous section:
     it's a good idea to put functions to differentiate to a separate file and then `include(...)` it.
     Also see [Code Discovery](@ref) for some other rules.
 
+Compiling function derivatives beforehand may be tedious, so there's also a convenient shortcut - `xgrad` -
+that compiles derivatives dynamically and caches them for later use. We can rewrite previous example as:
+
+```
+include("loss.jl")
+W = rand(3,4); b = rand(3); x = rand(4); y=rand(3)
+xgrad(loss; W=W, b=b, x=x, y=y)
+```
+
+This is very convenient when using in a training loop in machine learning, e.g. something like this:
+
+```
+W, b = ...
+for (x, y) in batchview((X, Y))
+    dW, db, dx, dy = xgrad(loss; W=W, b=b, x=x, y=y)   # compiled once, applied at each iteration
+    update_params!(W, b, dW, db)
+end
+```
 
 ## Memory buffers
 
@@ -175,6 +193,13 @@ mem = Dict()
 # ==> 100.354 ms (26 allocations: 797.86 KiB)
 ```
 
+`xgrad` supports memory buffers using keyword parameter `mem`:
+
+```
+@btime xgrad(loss; W=W, b=b, x=x, y=y, mem=mem)
+# ==> 100.640 ms (113 allocations: 802.36 KiB)
+```
+
 ## Struct derivatives
 
 So far our loss functions were pretty simple taking only a couple of parameters,
@@ -189,6 +214,10 @@ mutable struct Linear
     b::Vector{Float64}
 end
 
+# we need a default constructor to instantiate a struct
+# fields shouldn't necessary have meaningful values
+Linear() = Linear(zeros(1,1), zeros(1))
+
 predict(m::Linear, x) = m.W * x .+ m.b
 
 loss(m::Linear, x, y) = sum((predict(m, x) .- y).^2)
@@ -200,6 +229,8 @@ m = Linear(randn(3,4), randn(3))
 x = rand(4); y = rand(3)
 dloss = xdiff(loss; m=m, x=x, y=y)
 y_hat, dm, dx, dy = dloss(m, x, y)
+# or using `xgrad`
+y_hat, dm, dx, dy = xgrad(loss; m=m, x=x, y=y)
 ```
 Just like with arrays in previous example, `dm` has the same type (`Linear`) and size of its
 fields (`dm.W` and `dm.b`) as original model, but holds gradients of paramaters instead of
@@ -242,18 +273,18 @@ The next step is to find the derivative of $\frac{\partial z}{\partial y}$.
 We know that the derivative of `exp(u)` w.r.t. $u$ is also $exp(u)$. If there has been some
 accomulated derivative from variables later in the chain, we should also multiply by it:
 
-$$\frac{dz}{dy} = \frac{d(exp(y))}{dy} \cdot \frac{dz}{dz} = exp(y) \cdot \frac{dz}{dz}$$ 
+$$\frac{dz}{dy} = \frac{d(exp(y))}{dy} \cdot \frac{dz}{dz} = exp(y) \cdot \frac{dz}{dz}$$
 
 Finally, from math classes we know that the derivative of $sin(u)$ is $cos(u)$, so we add:
 
-$$\frac{dz}{dx} = \frac{d(sin(x))}{dx} \cdot \frac{dz}{dy} = cos(x) \cdot \frac{dz}{dy}$$ 
+$$\frac{dz}{dx} = \frac{d(sin(x))}{dx} \cdot \frac{dz}{dy} = cos(x) \cdot \frac{dz}{dy}$$
 
 The full derivative expression thus looks like:
 
 
 $$\frac{dz}{dz} = 1.0$$
 $$\frac{dz}{dy} = exp(y) \cdot \frac{dz}{dz}$$
-$$\frac{dz}{dx} = cos(x) \cdot \frac{dz}{dy}$$ 
+$$\frac{dz}{dx} = cos(x) \cdot \frac{dz}{dy}$$
 
 In case of scalar-valued function of multiple variables (i.e. $R^n \rightarrow R$,
 common in ML tasks) instead of "derivative" we say "gradient", but approach stays
