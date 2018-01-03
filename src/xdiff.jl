@@ -141,8 +141,13 @@ function rev_step!(g::ExGraph, dg::ExGraph, nd::ExNode{:call})
     dzdy_v = deriv_name(z, y)
     cg = cat(g, dg)
     ex = getexpr_kw(nd)
-    dep_vals = [getvalue(g[x]) for x in dependencies(nd)]
+    dep_vals = [x in g ? getvalue(g[x]) : eval(g.ctx[:mod], x)
+                for x in dependencies(nd)]
     for (i, x) in enumerate(dependencies(nd))
+        if !in(x, g)
+            # global constant
+            continue
+        end
         xnd = g[x]
         if isa(xnd, ExNode{:constant})
             # don't clog dg with unnesessary derivs
@@ -167,8 +172,14 @@ function rev_step!(g::ExGraph, dg::ExGraph, nd::ExNode{:bcast})
     dzdy_v = deriv_name(z, y)
     cg = cat(g, dg)
     ex = bcast_to_call(getexpr_kw(nd))
-    dep_vals = [getvalue(g[x])[1] for x in dependencies(nd)]
+    # assuming only array-like dependencies
+    dep_vals = [x in g ? getvalue(g[x])[1] : eval(g.ctx[:mod], x)[1]
+                for x in dependencies(nd)]
     for (i, x) in enumerate(dependencies(nd))
+        if !in(x, g)
+            # global constant
+            continue
+        end
         xnd = g[x]
         if isa(xnd, ExNode{:constant})
             # don't clog dg with unnesessary derivs
