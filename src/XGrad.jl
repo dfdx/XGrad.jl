@@ -3,6 +3,7 @@ module XGrad
 export
     xdiff,
     xgrad,
+    kgrad,
     @diffrule,
     VectorCodeGen,
     BufCodeGen,

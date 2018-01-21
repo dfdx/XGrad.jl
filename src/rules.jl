@@ -208,7 +208,7 @@ end
 
 # abs, max(), min()
 @diffrule abs(x::Real)                             x     sign(x) * ds
-@diffrule abs2(x::Real)                            x     2.0 .* abs(x) .* sign(x) .* x
+@diffrule abs2(x::Real)                            x     2.0 .* x .* ds
 
 
 @diffrule max(x::Real         , y::Real)           x     (x > y) * ds

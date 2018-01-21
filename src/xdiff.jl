@@ -42,10 +42,12 @@ function forward_pass!(g::ExGraph)
     known_funcs = map(sanitize, Set(rule[1].args[1] for rule in DIFF_RULES))
     done = false
     while !done
-        graph_funcs = Set(getexpr(nd).args[1] for nd in g if isa(nd, ExNode{:call}))
+        graph_funcs = Set(getexpr(nd).args[1] for nd in g
+                          if isa(nd, ExNode{:call}) || isa(nd, ExNode{:bcast}))
         unknown_funcs = setdiff(graph_funcs, known_funcs)
         unknown_func_vars = Set(varname(nd) for nd in g
-                                if isa(nd, ExNode{:call}) && getexpr(nd).args[1] in unknown_funcs)
+                                if (isa(nd, ExNode{:call}) || isa(nd, ExNode{:bcast}))
+                                && getexpr(nd).args[1] in unknown_funcs)
         g = inline_nodes(g, unknown_func_vars)
         evaluate!(g; force=true)
         done = isempty(unknown_func_vars)
@@ -106,10 +108,17 @@ function rev_step!(g::ExGraph, dg::ExGraph, nd::ExNode{:ref})
     idx = ex.args[2]
     dzdx_v = deriv_name(g.ctx[:loss], base_name)
     if !haskey(dg, dzdx_v)
-        @assert(isa(base_val, Tuple), "Currently only indexing of tuples is supported, " *
-                "but got $(typeof(base_val))")
-        tuple_ex = Expr(:tuple, (:_ for i=1:length(base_val))...)
-        push!(dg, :tuple, dzdx_v, tuple_ex)
+        if isa(base_val, Tuple)
+            tuple_ex = Expr(:tuple, (:_ for i=1:length(base_val))...)
+            push!(dg, :tuple, dzdx_v, tuple_ex)
+        elseif isa(base_val, AbstractArray)
+            # experimental: trying to support array literals by converting to tuples
+            tuple_ex = Expr(:tuple, (:_ for i=1:length(base_val))...)
+            push!(dg, :tuple, dzdx_v, tuple_ex)
+        else
+            error("Currently only indexing of tuples is supported, " *
+                  "but got $(typeof(base_val))")
+        end
     end
     dzdx_nd = dg[dzdx_v]
     dzdx_ex = getexpr(dzdx_nd)
@@ -231,7 +240,20 @@ iscuarray(v) = startswith(string(typeof(v)), "CuArray")
 
 
 """
-Differentiate expression w.r.t. its inputs
+    xdiff(ex; ctx=Dict(), inputs...)
+
+Differentiate scalar-valued expression w.r.t. its inputs,
+return expression for the derivatives.
+
+    ex = :(sum(w * x .- y))
+    dex = xdiff(ex; w=rand(2,3), x=rand(3,4), y=rand(2))
+
+`xdiff()` also accepts a context `ctx::Dict{Any,Any}` which can be used to pass options
+and extract additional information. Some options include:
+
+ * `codegen::Espresso.CodeGen` - code generator used for derivative expression;
+                                 valid values include `VecotorCodeGen()`, `BufCodeGen()`
+                                 and `CuCodeGen()`
 """
 function xdiff(ex; ctx=Dict(), inputs...)
     ctx = to_context(ctx)
@@ -252,7 +274,16 @@ end
 
 
 """
-Differentiate function w.r.t. its inputs
+    df = xdiff(f; ctx=Dict(), inputs...)
+
+Differentiate scalar-valued function w.r.t. its inputs, return derivative function.
+
+    loss(w, x, y) = sum(w * x .- y)
+    w = rand(2,3); x = rand(3,4); y = rand(2)
+    dloss = xdiff(loss; w=w, x=x, y=y) 
+    val, dw, dx, dy = dloss(w, x, y)
+
+See also `xgrad()` for a more dynamic API.
 """
 function xdiff(f::Function; ctx=Dict(), inputs...)
     ctx = to_context(ctx)
