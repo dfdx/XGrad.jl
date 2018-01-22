@@ -8,7 +8,7 @@ inputs = [:w => [1.0, 1.0], :b => 2.0, :x => [3.0, 3.0], :y => 4.0]
 vals = ([v for (k,v) in inputs]...)
 dlinreg_loss = xdiff(linreg_loss; inputs...)
 dvals = dlinreg_loss(vals...)
-@test dvals == (16.0, [96.0, 96.0], 32.0, [32.0, 32.0], -32.0)
+@test dvals == (16.0, [24.0, 24.0], 8.0, [8.0, 8.0], -8.0)
 
 
 # ReverseDiff doesn't support scalars yet
