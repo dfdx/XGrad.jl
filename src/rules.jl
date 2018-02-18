@@ -76,6 +76,17 @@ end
 @diffrule reshape(x::AbstractArray, _d::Tuple)     _d    0.0
 
 
+@diffrule getindex(x::AbstractArray, i)         x    ungetindex(x, ds, i)
+@diffrule getindex(x::AbstractArray, i, j)      x    ungetindex(x, ds, i, j)
+@diffrule getindex(x::AbstractArray, i, j, k)   x    ungetindex(x, ds, i, j, k)
+@diffrule getindex(x::AbstractArray, i)         i    0
+@diffrule getindex(x::AbstractArray, i, j)      i    0
+@diffrule getindex(x::AbstractArray, i, j)      j    0
+@diffrule getindex(x::AbstractArray, i, j, k)   i    0
+@diffrule getindex(x::AbstractArray, i, j, k)   j    0
+@diffrule getindex(x::AbstractArray, i, j, k)   k    0
+
+
 # square root
 @diffrule sqrt(x::Real)              x     0.5 * x ^ (-0.5) * ds
 @diffrule sqrt(x::AbstractVector)    x     0.5 .* x .^ (-0.5) .* ds
