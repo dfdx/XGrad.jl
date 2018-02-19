@@ -1,5 +1,4 @@
 
-
 mutable struct Linear2
     W::Matrix{Float64}
     b::Vector{Float64}    

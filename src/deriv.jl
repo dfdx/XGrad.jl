@@ -1,7 +1,7 @@
 
 ## deriv.jl - derivative of a single ExNode
 
-const DIFF_PHS = Set([:w, :x, :y, :z])
+const DIFF_PHS = Set([:w, :x, :y, :z, :i, :j, :k,])
 
 isparameters(a) = isa(a, Expr) && a.head == :parameters
 

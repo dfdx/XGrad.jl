@@ -1,3 +1,5 @@
-
 myfunc(x) = log(sum(x))
-test_compare(myfunc; x=rand(2))
+
+@testset "others" begin
+    test_compare(myfunc; x=rand(2))
+end
