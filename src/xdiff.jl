@@ -212,7 +212,9 @@ function reverse_pass!(g::ExGraph)
     z = @get_or_create(g.ctx, :loss, varname(g.tape[end]))
     dzdz_var = deriv_name(z, z)
     seed = @get_or_create(g.ctx, :seed, 1.0)
-    dg = ExGraph(:($dzdz_var = $seed); ctx=g.ctx)
+    # dg = ExGraph(:($dzdz_var = $seed); ctx=g.ctx)
+    dg = ExGraph(; ctx=g.ctx)
+    push!(dg, ExNode{:constant}(dzdz_var, seed; val=seed))
     for nd in reverse(g.tape)
         rev_step!(g, dg, nd)
     end
@@ -228,14 +230,7 @@ function _xdiff(g::AbstractExGraph)
 end
 
 
-iscuarray(v) = startswith(string(typeof(v)), "CuArray")
-
-# # currently CuArrays can't be used directly in xdiff, so instead we convert them
-# # to ordinary Arrays, find gradients and use CuCodeGen to generate code for CUDA
-# # if inputs are not CuArrays, this function effectively does nothing
-# function unconvert_cuarrays(inputs)
-#     return [iscuarray(v) ? k => convert(Array, v) : k => v for (k, v) in inputs]
-# end
+# iscuarray(v) = startswith(string(typeof(v)), "CuArray")
 
 
 

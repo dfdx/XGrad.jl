@@ -2,6 +2,7 @@
 ## xgrad0.jl - dynamic cache for xdiff
 
 DERIV_CACHE = Dict{Any,Any}()
+const DGRAD_CACHE = Dict{Any,Any}()
 
 
 getsize(x::AbstractArray) = size(x)
@@ -60,20 +61,45 @@ end
 
 
 
-function _kgrad(f::Function, args...; kwargs...)
-    vnames, _ = funexpr(f, map(typeof, args))
-    inputs = [n => v for (n, v) in zip(vnames, args)]
-    res = xgrad(f; inputs...)
-    return res[2]  # derivative of the first argument
+function _dgrad(f::Function, args...)
+    g = tracked_exgraph(f, args...)
+    key = graph_hash(g)   # TODO: handle different sizes
+    if haskey(DGRAD_CACHE, key)
+        return DGRAD_CACHE[key]
+    else
+        g, dg = _xdiff(g)
+        rg = cat(g, dg)
+        inputs = [getvar(nd) => getvalue(nd) for nd in g if isa(nd, ExNode{:input})]
+        outvars = unshift!([deriv_name(g.ctx[:loss], var) for (var, _) in inputs], varname(g[end]))
+        push!(rg, :tuple, Espresso.genname(), Expr(:tuple, outvars...))
+        rg = topsort(rg)
+        infer_deriv_size!(rg) # do we still need this? can we replace rsizes with actual sizes?
+        evaluate!(rg)
+        codegen = autoselect_codegen(inputs)
+        dex = generate_code(codegen, rg)
+        # generate function
+        mod = current_module()
+        name = Espresso.genname("$(func_name(f))_deriv_")
+        input_vars = [var for (var, val) in inputs]
+        types = [typeof(val) for (var, val) in inputs]
+        typed_args = [:($a::$t) for (a, t) in zip(input_vars, map(top_type, types))]
+        # function with kw argument `mem=Dict()`
+        fn_ex_mem_kw = make_func_expr(name, typed_args, [:mem => :(Dict{Any,Any}())], dex)
+        dfn = eval(mod, fn_ex_mem_kw)
+        return dfn
+    end
 end
 
-"""
-    kgrad(f::Function)
-
-Experimental: derivatives in the same form as used in AutoGrad/Knet.
 
 """
-function kgrad(f::Function)
-    # TODO: add kwargs & integrate mem
-    (args...) -> _kgrad(f, args...)
+    dgrad(f::Function)
+
+Experimental: dynamic differentiation
+
+"""
+function dgrad(f::Function)
+    (args...) -> begin
+        dfn = _dgrad(f, args...)
+        Base.invokelatest(dfn, args...)[2]
+    end
 end
