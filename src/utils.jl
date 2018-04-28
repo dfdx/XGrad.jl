@@ -99,3 +99,20 @@ top_type(x::T) where T = T
 top_type(::Type{AT}) where {AT <: AbstractArray{T,N}} where {T,N} = AbstractArray{T,N}
 top_type(::Type{T}) where {T <: Number} = Number
 top_type(::Type{T}) where T = T
+
+
+# refs
+
+function ref_to_getindex(g::ExGraph)
+    rg = Espresso.reset_tape(g)
+    for nd in g
+        if isa(nd, ExNode{:ref})
+            getindex_ex = rewrite(getexpr(nd), :(_x[_i...]), :(getindex(_x, _i...)))            
+            push!(rg, copy(nd; ex=getindex_ex, category=:call))
+        else
+            push!(rg, nd)
+        end
+    end
+    return rg
+end
+
