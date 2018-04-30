@@ -17,18 +17,22 @@ function ungetindex(x::AbstractArray, ds, i...)
 end
 
 
-## withindex
+@require StaticArrays begin
 
-"""
-Create an array similar to `x` with all zeros but one element at index I set to v
-"""
-function zeros_but(x::AbstractArray, v, I...)
-    x = zeros(x)
-    x[I...] = v
-    return x
-end
+    import StaticArrays: StaticArray, SVector, SMatrix
 
-
-function zeros_but_grad(dy, x::AbstractArray, v, I...)
-    
+    function ungetindex(sx::StaticArray, ds, i...)
+        # make ordinary array of the same size
+        x = Array{eltype(sx)}(size(sx))
+        copy!(x, sx)
+        dx = ungetindex(x, ds, i...)
+        # TODO: what is a generic constructor for SArray?
+        if ndims(sx) == 1
+            return SVector(dx...)
+        elseif ndims(sx) == 2
+            return SMatrix(dx...)
+        else
+            error("Don't know how to create $(ndims(sx))-dimensional StaticArray")
+        end
+    end
 end

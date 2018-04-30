@@ -3,7 +3,7 @@ module XGrad
 export
     xdiff,
     xgrad,
-    kgrad,
+    # kgrad,
     @diffrule,
     VectorCodeGen,
     BufCodeGen,
@@ -12,7 +12,8 @@ export
     @get_or_create,    
     __construct,
     # (other) helpers
-    ungetindex
+    ungetindex,
+    ungetindex!
 
 
 include("core.jl")
