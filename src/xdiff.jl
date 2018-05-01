@@ -346,11 +346,19 @@ function xdiff(f::Function; ctx=Dict(), inputs...)
     types = ([typeof(val) for (_, val) in inputs]...)
     args = get_or_generate_argnames(f, types)
     typed_args = [:($a::$t) for (a, t) in zip(args, map(top_type, types))]
-    # function with additional argument `mem`
-    fn_ex_mem = make_func_expr(name, [typed_args; :mem], [], dex)
-    fn = eval(mod, fn_ex_mem)
-    # function with kw argument `mem=Dict()`
-    fn_ex_mem_kw = make_func_expr(name, typed_args, [:mem => :(Dict{Any,Any}())], dex)
-    eval(mod, fn_ex_mem_kw)
+    if @get(ctx, :nomem, false)
+        # TODO: assert VectorCodeGen
+        # plain function without memory (only correct for VectorCodeGen)
+        # function with additional argument `mem`
+        fn_ex = make_func_expr(name, typed_args, [], dex)
+        fn = eval(fn_ex)
+    else
+        # function with additional argument `mem`
+        fn_ex_mem = make_func_expr(name, [typed_args; :mem], [], dex)
+        fn = eval(mod, fn_ex_mem)
+        # function with kw argument `mem=Dict()`
+        fn_ex_mem_kw = make_func_expr(name, typed_args, [:mem => :(Dict{Any,Any}())], dex)
+        eval(mod, fn_ex_mem_kw)
+    end
     return fn
 end
