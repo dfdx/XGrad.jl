@@ -52,7 +52,7 @@ function forward_pass!(g::ExGraph)
         evaluate!(g; force=true)
         done = isempty(unknown_func_vars)
     end
-    g = ref_to_getindex(g)
+    g = normalize_refs(g)
     return g
 end
 
@@ -106,16 +106,13 @@ function rev_step!(g::ExGraph, dg::ExGraph, nd::ExNode{:ref})
     ex = getexpr(nd)
     base_name = ex.args[1]
     base_val = getvalue(g[base_name])
-    idx = ex.args[2]
+    idx_v = ex.args[2]
+    idx = getvalue(g[idx_v])
     dzdx_v = deriv_name(g.ctx[:loss], base_name)
     if !haskey(dg, dzdx_v)
         if isa(base_val, Tuple)
             tuple_ex = Expr(:tuple, (:_ for i=1:length(base_val))...)
-            push!(dg, :tuple, dzdx_v, tuple_ex)
-            dzdx_nd = dg[dzdx_v]
-            dzdx_ex = getexpr(dzdx_nd)
-            dzdy_v = deriv_name(g.ctx[:loss], varname(nd))
-            dzdx_ex.args[idx] = dzdy_v
+            push!(dg, :tuple, dzdx_v, tuple_ex)            
         elseif isa(base_val, AbstractArray)
             error("You shouldn't have gotten here!")
             # for arrays we already have getindex/ungetindex, so just rewriting :ref to :call
@@ -133,10 +130,15 @@ function rev_step!(g::ExGraph, dg::ExGraph, nd::ExNode{:ref})
             # parse!(dg, :($dzdx_v = zeros($sz)))
             # push!(dg, :call, dzdx_v, :(zeros($sz)))
         else
+            # TODO: arrays are supported with `getindex`
             error("Currently only indexing of tuples is supported, " *
                   "but got $(typeof(base_val))")
         end
     end
+    dzdx_nd = dg[dzdx_v]
+    dzdx_ex = getexpr(dzdx_nd)
+    dzdy_v = deriv_name(g.ctx[:loss], varname(nd))    
+    dzdx_ex.args[idx] = dzdy_v
 end
 
 

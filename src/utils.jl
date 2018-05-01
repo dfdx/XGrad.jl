@@ -103,12 +103,18 @@ top_type(::Type{T}) where T = T
 
 # refs
 
-function ref_to_getindex(g::ExGraph)
+function array_ref_to_getindex(g::ExGraph)
     rg = Espresso.reset_tape(g)
     for nd in g
         if isa(nd, ExNode{:ref})
-            getindex_ex = rewrite(getexpr(nd), :(_x[_i...]), :(getindex(_x, _i...)))            
-            push!(rg, copy(nd; ex=getindex_ex, category=:call))
+            # note: NOT replacing :ref for tuples
+            base_nd = g[dependencies(nd)[1]]
+            if !isa(getvalue(base_nd), Tuple)
+                getindex_ex = rewrite(getexpr(nd), :(_x[_i...]), :(getindex(_x, _i...)))
+                push!(rg, copy(nd; ex=getindex_ex, category=:call))
+            else
+                push!(rg, nd)
+            end
         else
             push!(rg, nd)
         end
@@ -116,3 +122,35 @@ function ref_to_getindex(g::ExGraph)
     return rg
 end
 
+
+function tuple_getindex_to_ref(g::ExGraph)
+    rg = Espresso.reset_tape(g)
+    for nd in g
+        if isa(nd, ExNode{:call}) && getexpr(nd).args[1] == :getindex
+            # replace only for tuples
+            base_nd = g[dependencies(nd)[1]]
+            if isa(getvalue(base_nd), Tuple)
+                new_ex = rewrite(getexpr(nd), :(getindex(_x, _i...)), :(_x[_i...]))
+                push!(rg, copy(nd; ex=new_ex, category=:ref))
+            else
+                push!(rg, nd)
+            end
+        else
+            push!(rg, nd)
+        end
+    end
+    return rg
+end
+
+
+"""
+In tuples, replace all calls to `getindex(t, i...)` into `t[i...]` while
+in arrays do the opposite.
+
+Arrays and tuples are handled differently in XGrad and :call vs. :ref adds flexibility
+of easy dispatching.
+"""
+function normalize_refs(g::ExGraph)
+    @assert getvalue(g[end]) != nothing "Graph not evaluated!"
+    return g |> array_ref_to_getindex |> tuple_getindex_to_ref
+end

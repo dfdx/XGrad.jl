@@ -86,6 +86,8 @@ end
 @diffrule getindex(x::AbstractArray, i, j, k)   j    0
 @diffrule getindex(x::AbstractArray, i, j, k)   k    0
 
+# @diffrule getindex(x::Tuple, i)                 x    
+
 
 # square root
 @diffrule sqrt(x::Real)              x     0.5 * x ^ (-0.5) * ds
