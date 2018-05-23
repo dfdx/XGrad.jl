@@ -36,3 +36,18 @@ end
         end
     end
 end
+
+
+function outer_cat(xs::AbstractArray{T,N}...) where {T,N}
+    res = Array{T, N+1}(size(xs[1])..., length(xs))
+    colons = (Colon() for i in 1:N)
+    for i in eachindex(xs)
+        res[colons..., i] = xs[i]
+    end
+    return res
+end
+
+
+function outer_cat(xs::Number...)
+    return [xs...]
+end

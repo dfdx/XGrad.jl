@@ -246,14 +246,6 @@ end
 
 iscuarray(v) = startswith(string(typeof(v)), "CuArray")
 
-# # currently CuArrays can't be used directly in xdiff, so instead we convert them
-# # to ordinary Arrays, find gradients and use CuCodeGen to generate code for CUDA
-# # if inputs are not CuArrays, this function effectively does nothing
-# function unconvert_cuarrays(inputs)
-#     return [iscuarray(v) ? k => convert(Array, v) : k => v for (k, v) in inputs]
-# end
-
-
 
 """
     xdiff(ex; ctx=Dict(), inputs...)
