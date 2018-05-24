@@ -212,6 +212,7 @@ function reverse_pass!(g::ExGraph)
     z = @get_or_create(g.ctx, :loss, varname(g.tape[end]))
     dzdz_var = deriv_name(z, z)
     seed = @get_or_create(g.ctx, :seed, 1.0)
+    g.ctx[:method] = :parse  # forcing :parse method for derivative graph
     dg = ExGraph(:($dzdz_var = $seed); ctx=g.ctx)
     for nd in reverse(g.tape)
         rev_step!(g, dg, nd)
@@ -272,6 +273,35 @@ function xdiff(ex; ctx=Dict(), inputs...)
 end
 
 
+function xdiff_track(f::Function; ctx=Dict(), inputs...)
+    ctx = to_context(ctx)
+    codegen = @get_or_create(ctx, :codegen, autoselect_codegen(inputs))
+    ctx[:bitness] = sizeof(codegen.eltyp) * 8
+    g = ExGraph(; ctx=ctx, inputs...)
+    og = swap_default_graph!(g)
+    tracked_vals = [tracked_val(g, var, val) for (var, val) in inputs]
+    f(tracked_vals...)
+    swap_default_graph!(og)
+    g, dg = _xdiff(g)
+    rg = cat(g, dg)
+    outvars = unshift!([deriv_name(g.ctx[:loss], var) for (var, _) in inputs], varname(g[end]))
+    push!(rg, :tuple, Espresso.genname(), Expr(:tuple, outvars...))
+    rg = topsort(rg)
+    infer_deriv_size!(rg) # do we still need this? can we replace rsizes with actual sizes?
+    evaluate!(rg)
+    return generate_code(codegen, rg)
+end
+
+
+function xdiff_parse(f::Function; ctx=Dict(), inputs...)
+    ctx = to_context(ctx)
+    types = ([typeof(val) for (name, val) in inputs]...)
+    args, ex = funexpr(f, types)
+    ex = sanitize(ex)
+    ctx[:mod] = Espresso.func_mod(f)
+    return xdiff(ex; ctx=ctx, inputs...)
+end
+
 
 """
     df = xdiff(f; ctx=Dict(), inputs...)
@@ -280,21 +310,26 @@ Differentiate scalar-valued function w.r.t. its inputs, return derivative functi
 
     loss(w, x, y) = sum(w * x .- y)
     w = rand(2,3); x = rand(3,4); y = rand(2)
-    dloss = xdiff(loss; w=w, x=x, y=y) 
+    dloss = xdiff(loss; w=w, x=x, y=y)
     val, dw, dx, dy = dloss(w, x, y)
 
 See also `xgrad()` for a more dynamic API.
 """
 function xdiff(f::Function; ctx=Dict(), inputs...)
     ctx = to_context(ctx)
-    types = ([typeof(val) for (name, val) in inputs]...)
-    args, ex = funexpr(f, types)
-    ex = sanitize(ex)
-    ctx[:mod] = Espresso.func_mod(f)
-    dex = xdiff(ex; ctx=ctx, inputs...)
+    method = get(ctx, :method, :parse)
+    if method == :track
+        dex = xdiff_track(f; ctx=ctx, inputs...)
+    elseif method == :parse
+        dex = xdiff_parse(f; ctx=ctx, inputs...)
+    else
+        error("Method $method is not supported")
+    end
     ctx[:dex] = dex
     mod = get(ctx, :mod, current_module())
     name = Espresso.genname("$(func_name(f))_deriv_")
+    types = ([typeof(val) for (_, val) in inputs]...)
+    args = get_or_generate_argnames(f, types)
     typed_args = [:($a::$t) for (a, t) in zip(args, map(top_type, types))]
     # function with additional argument `mem`
     fn_ex_mem = make_func_expr(name, [typed_args; :mem], [], dex)
