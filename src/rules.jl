@@ -97,22 +97,23 @@ end
 @diffrule +(x::Real         , y::Real )            y     ds
 @diffrule +(x::AbstractArray, y::AbstractArray)    y     ds
 
-@diffrule +(x::Real         , y::AbstractArray)    x     sum(ds)
-@diffrule +(x::AbstractArray, y       )            x     ds
-@diffrule +(x::AbstractArray, y::Real )            y     sum(ds)
-@diffrule +(x               , y::AbstractArray)    y     ds
+# deprecated
+# @diffrule +(x::Real         , y::AbstractArray)    x     sum(ds)
+# @diffrule +(x::AbstractArray, y       )            x     ds
+# @diffrule +(x::AbstractArray, y::Real )            y     sum(ds)
+# @diffrule +(x               , y::AbstractArray)    y     ds
 
 # dot addition
 @diffrule .+(x::Real, y::Real)                      x     ds
 @diffrule .+(x::Real, y::AbstractArray)             x     sum(ds)
 @diffrule .+(x::AbstractArray, y::Real)             x     ds
-@diffrule .+(x::AbstractVector, y::AbstractMatrix)  x     squeeze(sum(ds, 2), 2)
+@diffrule .+(x::AbstractVector, y::AbstractMatrix)  x     squeeze_sum(ds, 2)
 @diffrule .+(x::AbstractArray, y::AbstractArray)    x     ds
 
 @diffrule .+(x::Real, y::Real)                      y     ds
 @diffrule .+(x::Real, y::AbstractArray)             y     ds
 @diffrule .+(x::AbstractArray, y::Real)             y     sum(ds)
-@diffrule .+(x::AbstractMatrix, y::AbstractVector)  y     squeeze(sum(ds, 2), 2)
+@diffrule .+(x::AbstractMatrix, y::AbstractVector)  y     squeeze_sum(ds, 2)
 @diffrule .+(x::AbstractArray, y::AbstractArray)    y     ds
 
 # unary substraction
@@ -121,29 +122,31 @@ end
 
 # binary substraction
 @diffrule -(x::Real, y::Real)                       x     ds
-@diffrule -(x::Real, y::AbstractArray)              x     sum(ds)
-@diffrule -(x::AbstractArray, y::Real)              x     ones(size(x)) .* ds
+# @diffrule -(x::Real, y::AbstractArray)              x     sum(ds)
+# @diffrule -(x::AbstractArray, y::Real)              x     ones(size(x)) .* ds
 @diffrule -(x::AbstractArray, y::AbstractArray)     x     ds
 @diffrule -(x::Real         , y::Real)              y     -ds
-@diffrule -(x::Real, y::AbstractArray)              y     -ones(size(y)) .* ds
-@diffrule -(x::AbstractArray, y::Real)              y     -sum(ds)
+# @diffrule -(x::Real, y::AbstractArray)              y     -ones(size(y)) .* ds
+# @diffrule -(x::AbstractArray, y::Real)              y     -sum(ds)
 @diffrule -(x::AbstractArray, y::AbstractArray)     y     -ds
 
 # dot binary substraction
 @diffrule .-(x::Real, y::Real)                      x     ds
 @diffrule .-(x::Real, y::AbstractArray)             x     sum(ds)
-@diffrule .-(x::AbstractVector, y::AbstractMatrix)  x     squeeze(sum(ds, 2), 2)
+@diffrule .-(x::AbstractArray, y::Real)             x     ones(size(x)) .* ds
+@diffrule .-(x::AbstractVector, y::AbstractMatrix)  x     squeeze_sum(ds, 2)
 @diffrule .-(x::AbstractArray, y::AbstractArray)    x     ds
 @diffrule .-(x::Real, y::Real)                      y     -ds
+@diffrule .-(x::Real, y::AbstractArray)             y     -ones(size(y)) .* ds
 @diffrule .-(x::AbstractArray, y::Real)             y     -sum(ds)
-@diffrule .-(x::AbstractMatrix, y::AbstractVector)  y     -squeeze(sum(ds, 2), 2)
+@diffrule .-(x::AbstractMatrix, y::AbstractVector)  y     -squeeze_sum(ds, 2)
 @diffrule .-(x::AbstractArray, y::AbstractArray)    y     -ds
 
 # sum() and mean()
 @diffrule sum(x::Real)                              x     ds
-@diffrule sum(x::AbstractArray)                     x     ones(size(x)) .* ds
-@diffrule sum(x::AbstractArray, y::Int)             x     ones(size(x)) .* ds
-@diffrule sum(x::AbstractArray, y::Int)             y     0.0
+@diffrule sum(x::AbstractArray)                     x     sum_grad(x, ds)
+# @diffrule sum(x::AbstractArray, y::Int)             x     ones(size(x)) .* ds
+# @diffrule sum(x::AbstractArray, y::Int)             y     0.0
 
 @diffrule mean(x::Real)                             x     ds
 @diffrule mean(x::AbstractArray)                    x     ones(size(x)) ./ length(x) .* ds
@@ -265,13 +268,13 @@ end
 @diffrule .*(x::Real, y::Real)                     x     y .* ds
 @diffrule .*(x::Real, y::AbstractArray)            x     sum(y .* ds)
 @diffrule .*(x::AbstractArray, y::Real)            x     y .* ds
-@diffrule .*(x::AbstractVector, y::AbstractMatrix) x     squeeze(sum(ds .* y, 2), 2) # ?
+@diffrule .*(x::AbstractVector, y::AbstractMatrix) x     squeeze_sum(ds .* y, 2) # ?
 @diffrule .*(x::AbstractArray, y::AbstractArray)   x     y .* ds
 
 @diffrule .*(x::Real, y::Real)                     y     x * ds
 @diffrule .*(x::Real, y::AbstractArray)            y     x .* ds
 @diffrule .*(x::AbstractArray, y::Real)            y     sum(x .* ds)
-@diffrule .*(x::AbstractMatrix, y::AbstractVector) y     squeeze(sum(ds .* x, 2), 2) # ?
+@diffrule .*(x::AbstractMatrix, y::AbstractVector) y     squeeze_sum(ds .* x, 2) # ?
 @diffrule .*(x::AbstractArray, y::AbstractArray)   y     x .* ds
 
 # power  (both args reals)

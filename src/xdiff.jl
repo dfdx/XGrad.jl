@@ -39,7 +39,7 @@ end
 
 function forward_pass!(g::ExGraph)
     evaluate!(g) # to get types of all variables and find correct functions to inline
-    known_funcs = map(sanitize, Set(rule[1].args[1] for rule in DIFF_RULES))
+    known_funcs = Set(sanitize(rule[1].args[1]) for rule in DIFF_RULES)
     done = false
     while !done
         graph_funcs = Set(getexpr(nd).args[1] for nd in g
@@ -150,7 +150,7 @@ function rev_step!(g::ExGraph, dg::ExGraph, nd::ExNode{:call})
     dzdy_v = deriv_name(z, y)
     cg = cat(g, dg)
     ex = getexpr_kw(nd)
-    dep_vals = [x in g ? getvalue(g[x]) : eval(g.ctx[:mod], x)
+    dep_vals = [x in g ? getvalue(g[x]) : Core.eval(g.ctx[:mod], x)
                 for x in dependencies(nd)]
     for (i, x) in enumerate(dependencies(nd))
         if !in(x, g)
@@ -182,7 +182,7 @@ function rev_step!(g::ExGraph, dg::ExGraph, nd::ExNode{:bcast})
     cg = cat(g, dg)
     ex = bcast_to_call(getexpr_kw(nd))
     # assuming only array-like dependencies
-    dep_vals = [x in g ? getvalue(g[x])[1] : eval(g.ctx[:mod], x)[1]
+    dep_vals = [x in g ? getvalue(g[x])[1] : Core.eval(g.ctx[:mod], x)[1]
                 for x in dependencies(nd)]
     for (i, x) in enumerate(dependencies(nd))
         if !in(x, g)
@@ -229,17 +229,6 @@ function _xdiff(g::AbstractExGraph)
 end
 
 
-iscuarray(v) = startswith(string(typeof(v)), "CuArray")
-
-# # currently CuArrays can't be used directly in xdiff, so instead we convert them
-# # to ordinary Arrays, find gradients and use CuCodeGen to generate code for CUDA
-# # if inputs are not CuArrays, this function effectively does nothing
-# function unconvert_cuarrays(inputs)
-#     return [iscuarray(v) ? k => convert(Array, v) : k => v for (k, v) in inputs]
-# end
-
-
-
 """
     xdiff(ex; ctx=Dict(), inputs...)
 
@@ -264,7 +253,8 @@ function xdiff(ex; ctx=Dict(), inputs...)
     g = ExGraph(ex; ctx=ctx, inputs...)
     g, dg = _xdiff(g)
     rg = cat(g, dg)
-    outvars = unshift!([deriv_name(g.ctx[:loss], var) for (var, _) in inputs], varname(g[end]))
+    outvars = [deriv_name(g.ctx[:loss], var) for (var, _) in inputs]
+    outvars = pushfirst!(outvars, varname(g[end]))
     push!(rg, :tuple, Espresso.genname(), Expr(:tuple, outvars...))
     rg = topsort(rg)
     infer_deriv_size!(rg) # do we still need this? can we replace rsizes with actual sizes?
@@ -284,7 +274,7 @@ function xdiff_track(f::Function; ctx=Dict(), inputs...)
     swap_default_graph!(og)
     g, dg = _xdiff(g)
     rg = cat(g, dg)
-    outvars = unshift!([deriv_name(g.ctx[:loss], var) for (var, _) in inputs], varname(g[end]))
+    outvars = pushfirst!([deriv_name(g.ctx[:loss], var) for (var, _) in inputs], varname(g[end]))
     push!(rg, :tuple, Espresso.genname(), Expr(:tuple, outvars...))
     rg = topsort(rg)
     infer_deriv_size!(rg) # do we still need this? can we replace rsizes with actual sizes?
@@ -295,7 +285,7 @@ end
 
 function xdiff_parse(f::Function; ctx=Dict(), inputs...)
     ctx = to_context(ctx)
-    types = ([typeof(val) for (name, val) in inputs]...)
+    types = ([typeof(val) for (name, val) in inputs]...,)
     args, ex = funexpr(f, types)
     ex = sanitize(ex)
     ctx[:mod] = Espresso.func_mod(f)
@@ -326,16 +316,16 @@ function xdiff(f::Function; ctx=Dict(), inputs...)
         error("Method $method is not supported")
     end
     ctx[:dex] = dex
-    mod = get(ctx, :mod, current_module())
+    mod = get(ctx, :mod, @__MODULE__)
     name = Espresso.genname("$(func_name(f))_deriv_")
-    types = ([typeof(val) for (_, val) in inputs]...)
+    types = ([typeof(val) for (_, val) in inputs]...,)
     args = get_or_generate_argnames(f, types)
     typed_args = [:($a::$t) for (a, t) in zip(args, map(top_type, types))]
     # function with additional argument `mem`
     fn_ex_mem = make_func_expr(name, [typed_args; :mem], [], dex)
-    fn = eval(mod, fn_ex_mem)
+    fn = Core.eval(mod, fn_ex_mem)
     # function with kw argument `mem=Dict()`
     fn_ex_mem_kw = make_func_expr(name, typed_args, [:mem => :(Dict{Any,Any}())], dex)
-    eval(mod, fn_ex_mem_kw)
+    Core.eval(mod, fn_ex_mem_kw)
     return fn
 end

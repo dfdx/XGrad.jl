@@ -8,11 +8,17 @@ export
     VectorCodeGen,
     BufCodeGen,
     CuCodeGen,
-    # re-export from Espresso
+    # re-exports
+    #  from Espresso
+    Espresso,
+    squeeze_sum,
     @get_or_create,    
     __construct,
+    #  from LinearAlgebra
+    mul!,
     # (other) helpers
-    ungetindex
+    ungetindex,
+    sum_grad
 
 
 include("core.jl")
