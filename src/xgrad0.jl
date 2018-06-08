@@ -14,7 +14,7 @@ function getsize(x)
             val = getfield(x, fld)
             push!(sz_arr, getsize(val))
         end
-        return (sz_arr...)
+        return (sz_arr...,)
     else
         return size(x)
     end

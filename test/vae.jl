@@ -16,8 +16,8 @@
         hd2 = tanh.(Wd2 * hd1 .+ bd2)
         x_rec = logistic.(Wd3 * hd2 .+ bd3)
         # loss
-        rec_loss = sum(x .* log.(1e-10 + x_rec) + (1 - x) .* log.(1e-10 + 1 - x_rec), 1)
-        latent_loss = -0.5 * sum(1 + log_sigma2 .- mu .^ 2 - exp.(log_sigma2), 1)
+        rec_loss = sum(x .* log.(1e-10 .+ x_rec) + (1 .- x) .* log.(1e-10 .+ 1 .- x_rec), dims=1)
+        latent_loss = -0.5 * sum(1 .+ log_sigma2 .- mu .^ 2 .- exp.(log_sigma2), dims=1)
         cost = mean(rec_loss .+ latent_loss)
     end
     

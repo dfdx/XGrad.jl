@@ -12,6 +12,11 @@ end
 
 
 function ungetindex(x::AbstractArray, ds, i...)
-    dx = zeros(x)
+    dx = zero(x)
     return ungetindex!(dx, x, ds, i...)
+end
+
+
+function sum_grad(x::AbstractArray, ds; opts...)
+    return ones(size(x)) .* ds
 end

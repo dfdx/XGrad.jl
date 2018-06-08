@@ -22,27 +22,42 @@ function get_arg_names(pat)
 end
 
 function get_arg_types(pat)
-    return [isa(a, Expr) ? eval(Base, a.args[2]) : Any for a in pat.args[2:end] if !isparameters(a)]
+    return [isa(a, Expr) ? Core.eval(Base, a.args[2]) : Any
+            for a in pat.args[2:end] if !isparameters(a)]
 end
 
 
 function match_rule(rule, ex, dep_vals, idx)
     tpat, (vname, rpat) = rule
-    vidx = findfirst(get_arg_names(tpat), vname)
+    vidx = findfirst(isequal(vname), get_arg_names(tpat))
     if idx != vidx
-        return Nullable{Any}()
+        return nothing
     end
     dep_types = get_arg_types(tpat)
     if length(dep_vals) != length(dep_types) ||
         !all(isa(v, t) for (v, t) in zip(dep_vals, dep_types))
-        return Nullable{Any}()
+        return nothing
     end
     pat = without_types(tpat)
-    if !matchingex(pat, ex; phs=DIFF_PHS)
-        return Nullable{Any}()
+    ex_ = without_keywords(ex)
+    if !matchingex(pat, ex_; phs=DIFF_PHS)
+        return nothing
     else
-        return Nullable{Any}(pat => rpat)
+        return pat => rpat
     end
+end
+
+
+function rewrite_with_keywords(ex, pat, rpat)
+    if rpat isa Expr && rpat.head == :call
+        op, args, kw_args = parse_call_expr(ex)
+        ex_no_kw = make_call_expr(op, args)
+        rex_no_kw = rewrite(ex_no_kw, pat, rpat; phs=DIFF_PHS)
+        rex = with_keywords(rex_no_kw, kw_args)
+    else
+        rex = rewrite(ex, pat, rpat; phs=DIFF_PHS)
+    end
+    return rex
 end
 
 
@@ -50,9 +65,9 @@ function deriv(ex, dep_vals, idx::Int)
     rex = nothing
     for rule in DIFF_RULES
         m = match_rule(rule, ex, dep_vals, idx)
-        if !isnull(m)
-            pat, rpat = get(m)
-            rex = rewrite(ex, pat, rpat; phs=DIFF_PHS)
+        if m != nothing
+            pat, rpat = m
+            rex = rewrite_with_keywords(ex, pat, rpat)
             break
         end
     end
@@ -61,4 +76,12 @@ function deriv(ex, dep_vals, idx::Int)
               "with types $(map(typeof, dep_vals))")
     end
     return rex
+end
+
+
+"""
+Internal function for finding rule by function name
+"""
+function find_rules_for(fun)
+    return [r for r in DIFF_RULES if r[1].args[1] == fun]
 end

@@ -1,4 +1,4 @@
-
+using LinearAlgebra
 using Espresso
 import Espresso: @get, @get_or_create,
     genname, to_context, subs_bcast_with_dot,

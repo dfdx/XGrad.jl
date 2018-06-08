@@ -8,7 +8,7 @@ function bcast_to_call(pex::Expr)
 end
 
 function calls_to_bcast(ex)
-    return macroexpand(:(@. $ex)) |> subs_bcast_with_dot
+    return macroexpand(Main, :(@. $ex)) |> subs_bcast_with_dot
 end
 
 deriv_name(z::Symbol, x::Symbol) = Symbol("d$(z)!d$(x)")

@@ -14,13 +14,13 @@
     
     
     function test_sum_1(x)
-        y = sum(x, 1)
+        y = sum(x, dims=1)
         y2 = y .+ 2
         z = sum(y2)
     end
     
     function test_sum_2(x)
-        y = sum(x, 2)
+        y = sum(x, dims=2)
         y2 = y .+ 2
         z = sum(y2)
     end
