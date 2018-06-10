@@ -1,8 +1,8 @@
-authors = ["Andrei Zhabinski <andrei.zhabinski@gmail.com>"]
 name = "XGrad"
-uuid = "f06b06aa-6afa-11e8-2a98-9d829055ec4f"
+repo = "https://github.com/dfdx/XGrad.jl.git"
+uuid = "c48004fe-d13f-5df9-98d5-0c1ab8e45fa0"
 version = "0.2.0"
 
 [deps]
-Espresso = "f3367e62-6a9b-11e8-3ca8-97e71e02b39c"
+Espresso = "6912e4f1-e036-58b0-9138-08d1e6358ea9"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"

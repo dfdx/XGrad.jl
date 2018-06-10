@@ -31,7 +31,7 @@ include("aggr.jl")
 include("linreg.jl")
 include("ann.jl")
 include("autoencoder.jl")
-include("vae.jl")
+# include("vae.jl")  -- disabled until Distributions are updated to Julia 0.7
 include("others.jl")
 include("struct.jl")
 include("xgrad.jl")
